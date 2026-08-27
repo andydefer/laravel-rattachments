@@ -15,48 +15,48 @@ use RuntimeException;
  *
  * Service interface for managing polymorphic attachments (rattachments).
  * Provides methods for attaching, detaching, and querying relationships
- * between any two models with roles and metadata.
+ * between any two models with optional roles and metadata.
  */
 interface RattachmentServiceInterface
 {
     /**
-     * Attach a model to another model with a role and optional metadata.
+     * Attach a model to another model with an optional role and metadata.
      *
      * @param  Model  $rattachable  The model being attached (e.g., User, Doctor)
      * @param  Model  $target  The target model to attach to (e.g., Hospital, Pharmacy)
-     * @param  EnumerableInterface  $role  The role of the attachment (e.g., 'doctor', 'pharmacist')
+     * @param  EnumerableInterface|null  $role  The role of the attachment (optional)
      * @param  array  $metadata  Additional metadata for the attachment
      * @return Model The created rattachment model
      *
      * @throws RuntimeException If the attachment already exists
      */
-    public function attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = []): Model;
+    public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model;
 
     /**
-     * Attach multiple models to a target model with the same role and metadata.
+     * Attach multiple models to a target model with an optional role and metadata.
      *
      * @param  Collection<int, Model>  $rattachables  Collection of models to attach
      * @param  Model  $target  The target model
-     * @param  EnumerableInterface  $role  The role for all attachments
+     * @param  EnumerableInterface|null  $role  The role for all attachments (optional)
      * @param  array  $metadata  Additional metadata for all attachments
      * @return Collection<int, Model> Collection of created rattachment models
      *
      * @throws RuntimeException If any attachment already exists
      */
-    public function attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = []): Collection;
+    public function attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection;
 
     /**
-     * Attach a model to multiple targets with the same role and metadata.
+     * Attach a model to multiple targets with an optional role and metadata.
      *
      * @param  Model  $rattachable  The model to attach
      * @param  Collection<int, Model>  $targets  Collection of target models
-     * @param  EnumerableInterface  $role  The role for all attachments
+     * @param  EnumerableInterface|null  $role  The role for all attachments (optional)
      * @param  array  $metadata  Additional metadata for all attachments
      * @return Collection<int, Model> Collection of created rattachment models
      *
      * @throws RuntimeException If any attachment already exists
      */
-    public function attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = []): Collection;
+    public function attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection;
 
     /**
      * Detach a model from another model.
@@ -323,11 +323,12 @@ interface RattachmentServiceInterface
     public function deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType): int;
 
     /**
-     * Sync attachments for a model with a given set of targets and roles.
+     * Sync attachments for a model with a given set of targets and optional roles.
      *
      * @param  Model  $rattachable  The attached model
-     * @param  array  $targets  Array of targets with roles and metadata
+     * @param  array  $targets  Array of targets with optional roles and metadata
      *                          Example: [['target' => $hospital, 'role' => 'doctor', 'metadata' => []]]
+     *                          Example: [['target' => $hospital, 'metadata' => ['key' => 'value']]]
      * @return Collection<int, Model> Collection of created/updated attachment models
      */
     public function syncAttachments(Model $rattachable, array $targets): Collection;

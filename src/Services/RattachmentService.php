@@ -29,11 +29,11 @@ final class RattachmentService implements RattachmentServiceInterface
      *
      * @param  Model  $rattachable  The model being attached
      * @param  Model  $target  The target model
-     * @param  EnumerableInterface  $role  The role
+     * @param  EnumerableInterface|null  $role  The role (nullable)
      *
      * @throws RuntimeException If constraints are violated
      */
-    private function validateConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void
+    private function validateConstraints(Model $rattachable, Model $target, ?EnumerableInterface $role): void
     {
         if (! $rattachable instanceof RattachmentConstraintsInterface) {
             return;
@@ -54,6 +54,11 @@ final class RattachmentService implements RattachmentServiceInterface
             ));
         }
 
+        // Si le rôle est null, on ne vérifie pas les contraintes de rôle
+        if ($role === null) {
+            return;
+        }
+
         // Vérifier si le rôle est autorisé pour ce target
         $allowedRoles = $allowed[$targetClass];
         if (! in_array($role, $allowedRoles, true)) {
@@ -69,7 +74,7 @@ final class RattachmentService implements RattachmentServiceInterface
         }
     }
 
-    public function attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = []): Model
+    public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model
     {
         // ✅ Valider les contraintes avant l'attachement
         $this->validateConstraints($rattachable, $target, $role);
@@ -96,7 +101,7 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->create($record);
     }
 
-    public function attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = []): Collection
+    public function attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection
     {
         $results = new Collection;
 
@@ -107,7 +112,7 @@ final class RattachmentService implements RattachmentServiceInterface
         return $results;
     }
 
-    public function attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = []): Collection
+    public function attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection
     {
         $results = new Collection;
 
@@ -525,12 +530,12 @@ final class RattachmentService implements RattachmentServiceInterface
         $newTargetIds = [];
 
         foreach ($targets as $targetData) {
-            if (! isset($targetData['target']) || ! isset($targetData['role'])) {
-                throw new RuntimeException('Each target must have "target" and "role" keys');
+            if (! isset($targetData['target'])) {
+                throw new RuntimeException('Each target must have "target" key');
             }
 
             $target = $targetData['target'];
-            $role = $targetData['role'];
+            $role = $targetData['role'] ?? null;
             $metadata = $targetData['metadata'] ?? [];
 
             // ✅ Valider les contraintes avant la synchronisation
@@ -541,7 +546,10 @@ final class RattachmentService implements RattachmentServiceInterface
             $existing = $this->findExisting($rattachable, $target);
 
             if ($existing) {
-                $this->updateRole($rattachable, $target, $role);
+                // Si un rôle est fourni, le mettre à jour
+                if ($role !== null) {
+                    $this->updateRole($rattachable, $target, $role);
+                }
 
                 if (! empty($metadata)) {
                     $this->updateMetadata($rattachable, $target, $metadata);
