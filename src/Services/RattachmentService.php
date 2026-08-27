@@ -18,6 +18,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
+/**
+ * Service for managing polymorphic attachments between Eloquent models.
+ *
+ * This service orchestrates all attachment operations including creation, update,
+ * deletion, and querying with support for roles, metadata, and constraints.
+ */
 final class RattachmentService implements RattachmentServiceInterface
 {
     public function __construct(
@@ -25,7 +31,9 @@ final class RattachmentService implements RattachmentServiceInterface
     ) {}
 
     /**
-     * Validate attachment constraints.
+     * Validates that the attachment respects the constraints defined by the rattachable model.
+     *
+     * Checks both allowed targets and allowed roles.
      *
      * @param  Model  $rattachable  The model being attached
      * @param  Model  $target  The target model
@@ -42,7 +50,6 @@ final class RattachmentService implements RattachmentServiceInterface
         $allowed = $rattachable->allowedTargets();
         $targetClass = $target->getMorphClass();
 
-        // Vérifier si le target est autorisé
         if (! isset($allowed[$targetClass])) {
             $allowedTargets = array_keys($allowed);
 
@@ -54,12 +61,10 @@ final class RattachmentService implements RattachmentServiceInterface
             ));
         }
 
-        // Si le rôle est null, on ne vérifie pas les contraintes de rôle
         if ($role === null) {
             return;
         }
 
-        // Vérifier si le rôle est autorisé pour ce target
         $allowedRoles = $allowed[$targetClass];
         if (! in_array($role, $allowedRoles, true)) {
             $allowedValues = array_map(fn ($r) => $r->getValue(), $allowedRoles);
@@ -75,7 +80,8 @@ final class RattachmentService implements RattachmentServiceInterface
     }
 
     /**
-     * Validate unique constraints.
+     * Validates that the attachment does not violate unique target constraints.
+     *
      * A model can only have ONE attachment per unique target type.
      *
      * @param  Model  $rattachable  The model being attached
@@ -92,12 +98,10 @@ final class RattachmentService implements RattachmentServiceInterface
         $uniqueTargets = $rattachable->uniqueTargets();
         $targetClass = $target->getMorphClass();
 
-        // Vérifier si ce type de target est en unique
         if (! in_array($targetClass, $uniqueTargets, true)) {
             return;
         }
 
-        // Vérifier si le rattachable a déjà un attachment vers ce type de target
         $filter = RattachmentFilterRecord::from([
             'rattachable_type' => $rattachable->getMorphClass(),
             'rattachable_id' => $rattachable->getKey(),
@@ -121,12 +125,12 @@ final class RattachmentService implements RattachmentServiceInterface
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model
     {
-        // ✅ Valider les contraintes avant l'attachement
         $this->validateConstraints($rattachable, $target, $role);
-
-        // ✅ Valider les contraintes uniques
         $this->validateUniqueConstraints($rattachable, $target);
 
         if ($this->isAttached($rattachable, $target)) {
@@ -151,6 +155,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->create($record);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection
     {
         $results = new Collection;
@@ -162,6 +169,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $results;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection
     {
         $results = new Collection;
@@ -173,6 +183,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $results;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function detach(Model $rattachable, Model $target): void
     {
         $existing = $this->findExisting($rattachable, $target);
@@ -190,6 +203,9 @@ final class RattachmentService implements RattachmentServiceInterface
         $this->repository->delete($existing->id);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function detachMultiple(Collection $rattachables, Model $target): void
     {
         foreach ($rattachables as $rattachable) {
@@ -197,6 +213,9 @@ final class RattachmentService implements RattachmentServiceInterface
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function detachFromMultiple(Model $rattachable, Collection $targets): void
     {
         foreach ($targets as $target) {
@@ -204,6 +223,9 @@ final class RattachmentService implements RattachmentServiceInterface
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function detachAll(Model $model): void
     {
         $this->repository->deleteBulk(
@@ -221,6 +243,13 @@ final class RattachmentService implements RattachmentServiceInterface
         );
     }
 
+    /**
+     * Finds an existing attachment between two models.
+     *
+     * @param  Model  $rattachable  The rattachable model
+     * @param  Model  $target  The target model
+     * @return Model|null The attachment model or null if not found
+     */
     private function findExisting(Model $rattachable, Model $target): ?Model
     {
         $filter = RattachmentFilterRecord::from([
@@ -240,6 +269,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $collection->first();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function isAttached(Model $rattachable, Model $target): bool
     {
         $filter = RattachmentFilterRecord::from([
@@ -252,6 +284,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->exists($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function hasRoleAttached(Model $target, EnumerableInterface $role): bool
     {
         $filter = RattachmentFilterRecord::from([
@@ -263,6 +298,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->exists($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getRattachables(Model $target): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -277,6 +315,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $rattachments->map(fn ($rattachment) => $rattachment->rattachable);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getRattachablesPaginated(Model $target, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
         $filter = RattachmentFilterRecord::from([
@@ -293,6 +334,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->paginate($paginateRecord);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getTargets(Model $rattachable): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -307,6 +351,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $rattachments->map(fn ($rattachment) => $rattachment->target);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getTargetsPaginated(Model $rattachable, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
         $filter = RattachmentFilterRecord::from([
@@ -323,6 +370,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->paginate($paginateRecord);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getRattachablesByRole(Model $target, EnumerableInterface $role): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -338,6 +388,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $rattachments->map(fn ($rattachment) => $rattachment->rattachable);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getRattachablesByRolePaginated(Model $target, EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
         $filter = RattachmentFilterRecord::from([
@@ -355,6 +408,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->paginate($paginateRecord);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getTargetsByRole(Model $rattachable, EnumerableInterface $role): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -370,6 +426,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $rattachments->map(fn ($rattachment) => $rattachment->target);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getTargetsByRolePaginated(Model $rattachable, EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
         $filter = RattachmentFilterRecord::from([
@@ -387,6 +446,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->paginate($paginateRecord);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function countRattachables(Model $target): int
     {
         $filter = RattachmentFilterRecord::from([
@@ -397,6 +459,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->count($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function countTargets(Model $rattachable): int
     {
         $filter = RattachmentFilterRecord::from([
@@ -407,6 +472,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->count($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function countRattachablesByRole(Model $target, EnumerableInterface $role): int
     {
         $filter = RattachmentFilterRecord::from([
@@ -418,6 +486,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->count($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function countTargetsByRole(Model $rattachable, EnumerableInterface $role): int
     {
         $filter = RattachmentFilterRecord::from([
@@ -429,6 +500,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->count($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getDistinctRolesForTarget(Model $target): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -443,6 +517,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $rattachments->pluck('role')->unique()->values();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getDistinctRolesForRattachable(Model $rattachable): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -457,9 +534,49 @@ final class RattachmentService implements RattachmentServiceInterface
         return $rattachments->pluck('role')->unique()->values();
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public function getTargetsByType(Model $rattachable, string $targetClass): Collection
+    {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $targetClass,
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        return $rattachments->map(fn ($rattachment) => $rattachment->target);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getTargetsByTypePaginated(Model $rattachable, string $targetClass, int $perPage = 15, int $page = 1): LengthAwarePaginator
+    {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $targetClass,
+        ]);
+
+        $paginateRecord = new PaginateRecord(
+            perPage: $perPage,
+            page: $page,
+            filters: $filter,
+        );
+
+        return $this->repository->paginate($paginateRecord);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function updateRole(Model $rattachable, Model $target, EnumerableInterface $role): void
     {
-        // ✅ Valider les contraintes avant la mise à jour du rôle
         $this->validateConstraints($rattachable, $target, $role);
 
         $existing = $this->findExisting($rattachable, $target);
@@ -477,6 +594,9 @@ final class RattachmentService implements RattachmentServiceInterface
         $this->repository->update($existing->id, RattachmentRecord::from(['role' => $role]));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function updateRoleForMultiple(Collection $rattachables, Model $target, EnumerableInterface $role): void
     {
         foreach ($rattachables as $rattachable) {
@@ -484,6 +604,9 @@ final class RattachmentService implements RattachmentServiceInterface
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function updateMetadata(Model $rattachable, Model $target, array $metadata): void
     {
         $existing = $this->findExisting($rattachable, $target);
@@ -501,6 +624,9 @@ final class RattachmentService implements RattachmentServiceInterface
         $this->repository->update($existing->id, RattachmentRecord::from(['metadata' => $metadata]));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function mergeMetadata(Model $rattachable, Model $target, array $metadata): void
     {
         $existing = $this->findExisting($rattachable, $target);
@@ -521,11 +647,17 @@ final class RattachmentService implements RattachmentServiceInterface
         $this->repository->update($existing->id, RattachmentRecord::from(['metadata' => $mergedMetadata]));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getAttachment(Model $rattachable, Model $target): ?Model
     {
         return $this->findExisting($rattachable, $target);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function hasAttachmentsBetween(Model $rattachable, Model $target): bool
     {
         $filter = RattachmentFilterRecord::from([
@@ -538,6 +670,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->exists($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function hasAttachmentsBetweenTypes(string $rattachableType, string $targetType): bool
     {
         $filter = RattachmentFilterRecord::from([
@@ -548,6 +683,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->exists($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getAttachmentsBetweenTypes(string $rattachableType, string $targetType): Collection
     {
         $filter = RattachmentFilterRecord::from([
@@ -560,6 +698,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->findBy($findByRecord);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType): int
     {
         $filter = RattachmentFilterRecord::from([
@@ -570,6 +711,9 @@ final class RattachmentService implements RattachmentServiceInterface
         return $this->repository->deleteBulk($filter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function syncAttachments(Model $rattachable, array $targets): Collection
     {
         $results = new Collection;
@@ -588,10 +732,7 @@ final class RattachmentService implements RattachmentServiceInterface
             $role = $targetData['role'] ?? null;
             $metadata = $targetData['metadata'] ?? [];
 
-            // ✅ Valider les contraintes avant la synchronisation
             $this->validateConstraints($rattachable, $target, $role);
-
-            // ✅ Valider les contraintes uniques
             $this->validateUniqueConstraints($rattachable, $target);
 
             $newTargetIds[] = $target->getKey();
@@ -624,5 +765,70 @@ final class RattachmentService implements RattachmentServiceInterface
         }
 
         return $results;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getTargetsByTypeAndRole(Model $rattachable, string $targetClass, EnumerableInterface $role): Collection
+    {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $targetClass,
+            'role' => $role,
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        return $rattachments->map(fn ($rattachment) => $rattachment->target);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getTargetsByTypeAndRoles(Model $rattachable, string $targetClass, array $roles): Collection
+    {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $targetClass,
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        $roleValues = array_map(fn ($role) => $role->getValue(), $roles);
+
+        return $rattachments
+            ->filter(fn ($rattachment) => in_array($rattachment->role?->getValue(), $roleValues, true))
+            ->map(fn ($rattachment) => $rattachment->target);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getTargetsByTypesAndRoles(Model $rattachable, array $targetClasses, array $roles): Collection
+    {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        $roleValues = array_map(fn ($role) => $role->getValue(), $roles);
+
+        return $rattachments
+            ->filter(
+                fn ($rattachment) => in_array($rattachment->target_type, $targetClasses, true)
+                    && in_array($rattachment->role?->getValue(), $roleValues, true)
+            )
+            ->map(fn ($rattachment) => $rattachment->target);
     }
 }

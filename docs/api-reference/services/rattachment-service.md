@@ -2,7 +2,7 @@
 
 ## Description
 
-Service central de gestion des rattachements polymorphiques (rattachments) entre modèles Eloquent. Orchestre les opérations CRUD avec validation des contraintes, gestion des rôles et des métadonnées.
+Service central de gestion des rattachements polymorphiques entre modèles Eloquent. Orchestre les opérations CRUD avec validation des contraintes, gestion des rôles et des métadonnées.
 
 ## Hiérarchie / Implémentations
 
@@ -30,24 +30,23 @@ Le service orchestre toutes les opérations liées aux rattachements :
 
 ### `attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model`
 
+Crée un rattachement entre deux modèles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$rattachable` | `Model` | Modèle à rattacher (ex: User, Doctor) |
-| `$target` | `Model` | Modèle cible du rattachement (ex: Hospital, Pharmacy) |
-| `$role` | `EnumerableInterface|null` | Rôle du rattachement (peut être null) |
-| `$metadata` | `array` | Métadonnées supplémentaires (ex: ['priority' => 'high']) |
+| `$target` | `Model` | Modèle cible (ex: Hospital, Pharmacy) |
+| `$role` | `EnumerableInterface|null` | Rôle du rattachement (optionnel) |
+| `$metadata` | `array<string, mixed>` | Métadonnées supplémentaires |
 
 **Retourne :** `Model` - L'instance de `Rattachment` créée
 
 **Exceptions :**
 - `RuntimeException` - Si le rattachement existe déjà
-- `RuntimeException` - Si les contraintes sont violées (si `RattachmentConstraintsInterface` est implémenté)
-- `RuntimeException` - Si une contrainte unique est violée
+- `RuntimeException` - Si les contraintes sont violées
 
 **Exemple :**
 ```php
-use AndyDefer\LaravelRattachments\Enums\Role;
-
 $attachment = $service->attach(
     $doctor,
     $hospital,
@@ -60,14 +59,16 @@ $attachment = $service->attach(
 
 ### `attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection`
 
+Attache plusieurs modèles à une même cible.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachables` | `Collection<Model>` | Collection de modèles à rattacher |
+| `$rattachables` | `Collection<int, Model>` | Collection de modèles à rattacher |
 | `$target` | `Model` | Modèle cible |
 | `$role` | `EnumerableInterface|null` | Rôle pour tous les rattachements |
-| `$metadata` | `array` | Métadonnées communes |
+| `$metadata` | `array<string, mixed>` | Métadonnées communes |
 
-**Retourne :** `Collection<Model>` - Collection des rattachements créés
+**Retourne :** `Collection<int, Model>` - Collection des rattachements créés
 
 **Exceptions :** `RuntimeException` - Si un rattachement existe déjà ou contraintes violées
 
@@ -84,14 +85,16 @@ $attachments = $service->attachMultiple(
 
 ### `attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection`
 
+Attache un modèle à plusieurs cibles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$rattachable` | `Model` | Modèle à rattacher |
-| `$targets` | `Collection<Model>` | Collection de modèles cibles |
+| `$targets` | `Collection<int, Model>` | Collection de modèles cibles |
 | `$role` | `EnumerableInterface|null` | Rôle pour tous les rattachements |
-| `$metadata` | `array` | Métadonnées communes |
+| `$metadata` | `array<string, mixed>` | Métadonnées communes |
 
-**Retourne :** `Collection<Model>` - Collection des rattachements créés
+**Retourne :** `Collection<int, Model>` - Collection des rattachements créés
 
 **Exemple :**
 ```php
@@ -106,6 +109,8 @@ $attachments = $service->attachToMultiple(
 
 ### `detach(Model $rattachable, Model $target): void`
 
+Supprime un rattachement entre deux modèles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$rattachable` | `Model` | Modèle à détacher |
@@ -117,31 +122,39 @@ $attachments = $service->attachToMultiple(
 
 ### `detachMultiple(Collection $rattachables, Model $target): void`
 
+Supprime plusieurs modèles d'une même cible.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachables` | `Collection<Model>` | Collection de modèles à détacher |
+| `$rattachables` | `Collection<int, Model>` | Collection de modèles à détacher |
 | `$target` | `Model` | Modèle cible |
 
 ---
 
 ### `detachFromMultiple(Model $rattachable, Collection $targets): void`
 
+Supprime un modèle de plusieurs cibles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$rattachable` | `Model` | Modèle à détacher |
-| `$targets` | `Collection<Model>` | Collection de modèles cibles |
+| `$targets` | `Collection<int, Model>` | Collection de modèles cibles |
 
 ---
 
 ### `detachAll(Model $model): void`
 
+Supprime tous les rattachements d'un modèle (comme rattachable ET target).
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$model` | `Model` | Modèle à détacher de tous ses rattachements (comme rattachable ET target) |
+| `$model` | `Model` | Modèle à détacher |
 
 ---
 
 ### `isAttached(Model $rattachable, Model $target): bool`
+
+Vérifie si un modèle est attaché à un autre.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -154,6 +167,8 @@ $attachments = $service->attachToMultiple(
 
 ### `hasRoleAttached(Model $target, EnumerableInterface $role): bool`
 
+Vérifie si un rôle existe pour une cible.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$target` | `Model` | Modèle cible |
@@ -165,15 +180,19 @@ $attachments = $service->attachToMultiple(
 
 ### `getRattachables(Model $target): Collection`
 
+Récupère tous les modèles attachés à une cible.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$target` | `Model` | Modèle cible |
 
-**Retourne :** `Collection<Model>` - Tous les modèles rattachés à la cible
+**Retourne :** `Collection<int, Model>` - Modèles attachés
 
 ---
 
 ### `getRattachablesPaginated(Model $target, int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+Récupère les modèles attachés à une cible avec pagination.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -187,19 +206,23 @@ $attachments = $service->attachToMultiple(
 
 ### `getTargets(Model $rattachable): Collection`
 
+Récupère toutes les cibles d'un modèle.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 
-**Retourne :** `Collection<Model>` - Toutes les cibles du modèle
+**Retourne :** `Collection<int, Model>` - Cibles du modèle
 
 ---
 
 ### `getTargetsPaginated(Model $rattachable, int $perPage = 15, int $page = 1): LengthAwarePaginator`
 
+Récupère les cibles d'un modèle avec pagination.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$perPage` | `int` | Éléments par page |
 | `$page` | `int` | Numéro de page |
 
@@ -209,16 +232,20 @@ $attachments = $service->attachToMultiple(
 
 ### `getRattachablesByRole(Model $target, EnumerableInterface $role): Collection`
 
+Récupère les modèles attachés à une cible avec un rôle spécifique.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$target` | `Model` | Modèle cible |
 | `$role` | `EnumerableInterface` | Rôle à filtrer |
 
-**Retourne :** `Collection<Model>` - Modèles rattachés avec le rôle spécifié
+**Retourne :** `Collection<int, Model>` - Modèles avec le rôle spécifié
 
 ---
 
 ### `getRattachablesByRolePaginated(Model $target, EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+Récupère les modèles attachés par rôle avec pagination.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -233,20 +260,24 @@ $attachments = $service->attachToMultiple(
 
 ### `getTargetsByRole(Model $rattachable, EnumerableInterface $role): Collection`
 
+Récupère les cibles d'un modèle avec un rôle spécifique.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$role` | `EnumerableInterface` | Rôle à filtrer |
 
-**Retourne :** `Collection<Model>` - Cibles avec le rôle spécifié
+**Retourne :** `Collection<int, Model>` - Cibles avec le rôle spécifié
 
 ---
 
 ### `getTargetsByRolePaginated(Model $rattachable, EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator`
 
+Récupère les cibles par rôle avec pagination.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$role` | `EnumerableInterface` | Rôle à filtrer |
 | `$perPage` | `int` | Éléments par page |
 | `$page` | `int` | Numéro de page |
@@ -255,7 +286,111 @@ $attachments = $service->attachToMultiple(
 
 ---
 
+### `getTargetsByType(Model $rattachable, string $targetClass): Collection`
+
+Récupère les cibles d'un type spécifique.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$rattachable` | `Model` | Modèle attaché |
+| `$targetClass` | `string` | FQCN de la classe cible |
+
+**Retourne :** `Collection<int, Model>` - Cibles du type spécifié
+
+**Exemple :**
+```php
+$hospitals = $service->getTargetsByType($doctor, Hospital::class);
+```
+
+---
+
+### `getTargetsByTypePaginated(Model $rattachable, string $targetClass, int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+Récupère les cibles d'un type spécifique avec pagination.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$rattachable` | `Model` | Modèle attaché |
+| `$targetClass` | `string` | FQCN de la classe cible |
+| `$perPage` | `int` | Éléments par page |
+| `$page` | `int` | Numéro de page |
+
+**Retourne :** `LengthAwarePaginator` - Résultats paginés
+
+---
+
+### `getTargetsByTypeAndRole(Model $rattachable, string $targetClass, EnumerableInterface $role): Collection`
+
+Récupère les cibles d'un type spécifique avec un rôle spécifique.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$rattachable` | `Model` | Modèle attaché |
+| `$targetClass` | `string` | FQCN de la classe cible |
+| `$role` | `EnumerableInterface` | Rôle à filtrer |
+
+**Retourne :** `Collection<int, Model>` - Cibles filtrées par type et rôle
+
+**Exemple :**
+```php
+$hospitals = $service->getTargetsByTypeAndRole(
+    $doctor, 
+    Hospital::class, 
+    Role::DOCTOR
+);
+```
+
+---
+
+### `getTargetsByTypeAndRoles(Model $rattachable, string $targetClass, array $roles): Collection`
+
+Récupère les cibles d'un type spécifique avec plusieurs rôles.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$rattachable` | `Model` | Modèle attaché |
+| `$targetClass` | `string` | FQCN de la classe cible |
+| `$roles` | `array<int, EnumerableInterface>` | Rôles à filtrer |
+
+**Retourne :** `Collection<int, Model>` - Cibles avec l'un des rôles
+
+**Exemple :**
+```php
+$hospitals = $service->getTargetsByTypeAndRoles(
+    $doctor, 
+    Hospital::class, 
+    [Role::DOCTOR, Role::ADMIN]
+);
+```
+
+---
+
+### `getTargetsByTypesAndRoles(Model $rattachable, array $targetClasses, array $roles): Collection`
+
+Récupère les cibles de plusieurs types avec plusieurs rôles.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$rattachable` | `Model` | Modèle attaché |
+| `$targetClasses` | `array<int, string>` | FQCNs des classes cibles |
+| `$roles` | `array<int, EnumerableInterface>` | Rôles à filtrer |
+
+**Retourne :** `Collection<int, Model>` - Cibles filtrées
+
+**Exemple :**
+```php
+$targets = $service->getTargetsByTypesAndRoles(
+    $doctor, 
+    [Hospital::class, Pharmacy::class], 
+    [Role::DOCTOR, Role::PHARMACIST]
+);
+```
+
+---
+
 ### `countRattachables(Model $target): int`
+
+Compte tous les modèles attachés à une cible.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -267,15 +402,19 @@ $attachments = $service->attachToMultiple(
 
 ### `countTargets(Model $rattachable): int`
 
+Compte toutes les cibles d'un modèle.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 
 **Retourne :** `int` - Nombre de cibles
 
 ---
 
 ### `countRattachablesByRole(Model $target, EnumerableInterface $role): int`
+
+Compte les modèles attachés à une cible avec un rôle spécifique.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -288,9 +427,11 @@ $attachments = $service->attachToMultiple(
 
 ### `countTargetsByRole(Model $rattachable, EnumerableInterface $role): int`
 
+Compte les cibles d'un modèle avec un rôle spécifique.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$role` | `EnumerableInterface` | Rôle à filtrer |
 
 **Retourne :** `int` - Nombre de cibles avec ce rôle
@@ -299,41 +440,51 @@ $attachments = $service->attachToMultiple(
 
 ### `getDistinctRolesForTarget(Model $target): Collection`
 
+Récupère tous les rôles distincts pour une cible.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$target` | `Model` | Modèle cible |
 
-**Retourne :** `Collection` - Rôles distincts pour cette cible
+**Retourne :** `Collection<int, EnumerableInterface>` - Rôles distincts
 
 ---
 
 ### `getDistinctRolesForRattachable(Model $rattachable): Collection`
 
+Récupère tous les rôles distincts pour un modèle.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 
-**Retourne :** `Collection` - Rôles distincts pour ce modèle
+**Retourne :** `Collection<int, EnumerableInterface>` - Rôles distincts
 
 ---
 
 ### `updateRole(Model $rattachable, Model $target, EnumerableInterface $role): void`
 
+Met à jour le rôle d'un rattachement existant.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$target` | `Model` | Modèle cible |
 | `$role` | `EnumerableInterface` | Nouveau rôle |
 
-**Exceptions :** `RuntimeException` - Si le rattachement n'existe pas ou contraintes violées
+**Exceptions :** 
+- `RuntimeException` - Si le rattachement n'existe pas
+- `RuntimeException` - Si les contraintes sont violées
 
 ---
 
 ### `updateRoleForMultiple(Collection $rattachables, Model $target, EnumerableInterface $role): void`
 
+Met à jour le rôle de plusieurs rattachements.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachables` | `Collection<Model>` | Collection de modèles rattachés |
+| `$rattachables` | `Collection<int, Model>` | Collection de modèles attachés |
 | `$target` | `Model` | Modèle cible |
 | `$role` | `EnumerableInterface` | Nouveau rôle |
 
@@ -341,11 +492,13 @@ $attachments = $service->attachToMultiple(
 
 ### `updateMetadata(Model $rattachable, Model $target, array $metadata): void`
 
+Met à jour les métadonnées d'un rattachement existant.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$target` | `Model` | Modèle cible |
-| `$metadata` | `array` | Nouvelles métadonnées |
+| `$metadata` | `array<string, mixed>` | Nouvelles métadonnées |
 
 **Exceptions :** `RuntimeException` - Si le rattachement n'existe pas
 
@@ -353,13 +506,13 @@ $attachments = $service->attachToMultiple(
 
 ### `mergeMetadata(Model $rattachable, Model $target, array $metadata): void`
 
+Fusionne les métadonnées d'un rattachement existant.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$target` | `Model` | Modèle cible |
-| `$metadata` | `array` | Métadonnées à fusionner |
-
-**Fonctionnement :** Fusionne les nouvelles métadonnées avec les existantes (via `StrictDataObject::merge()`)
+| `$metadata` | `array<string, mixed>` | Métadonnées à fusionner |
 
 **Exceptions :** `RuntimeException` - Si le rattachement n'existe pas
 
@@ -367,54 +520,64 @@ $attachments = $service->attachToMultiple(
 
 ### `getAttachment(Model $rattachable, Model $target): ?Model`
 
+Récupère un rattachement spécifique entre deux modèles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$target` | `Model` | Modèle cible |
 
-**Retourne :** `?Model` - Le rattachement ou null
+**Retourne :** `?Model` - Le rattachement ou `null`
 
 ---
 
 ### `hasAttachmentsBetween(Model $rattachable, Model $target): bool`
 
+Vérifie si un rattachement existe entre deux modèles spécifiques.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachable` | `Model` | Modèle rattaché |
+| `$rattachable` | `Model` | Modèle attaché |
 | `$target` | `Model` | Modèle cible |
 
-**Retourne :** `bool` - `true` si un rattachement existe entre ces deux modèles spécifiques
+**Retourne :** `bool` - `true` si le rattachement existe
 
 ---
 
 ### `hasAttachmentsBetweenTypes(string $rattachableType, string $targetType): bool`
 
+Vérifie si des rattachements existent entre deux types de modèles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachableType` | `string` | Type du modèle rattaché (morph class) |
-| `$targetType` | `string` | Type du modèle cible (morph class) |
+| `$rattachableType` | `string` | Morph class du modèle attaché |
+| `$targetType` | `string` | Morph class du modèle cible |
 
-**Retourne :** `bool` - `true` si un rattachement existe entre ces deux types
+**Retourne :** `bool` - `true` si un rattachement existe
 
 ---
 
 ### `getAttachmentsBetweenTypes(string $rattachableType, string $targetType): Collection`
 
+Récupère tous les rattachements entre deux types de modèles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachableType` | `string` | Type du modèle rattaché (morph class) |
-| `$targetType` | `string` | Type du modèle cible (morph class) |
+| `$rattachableType` | `string` | Morph class du modèle attaché |
+| `$targetType` | `string` | Morph class du modèle cible |
 
-**Retourne :** `Collection<Model>` - Tous les rattachements entre ces deux types
+**Retourne :** `Collection<int, Model>` - Rattachements trouvés
 
 ---
 
 ### `deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType): int`
 
+Supprime tous les rattachements entre deux types de modèles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$rattachableType` | `string` | Type du modèle rattaché (morph class) |
-| `$targetType` | `string` | Type du modèle cible (morph class) |
+| `$rattachableType` | `string` | Morph class du modèle attaché |
+| `$targetType` | `string` | Morph class du modèle cible |
 
 **Retourne :** `int` - Nombre de rattachements supprimés
 
@@ -422,45 +585,38 @@ $attachments = $service->attachToMultiple(
 
 ### `syncAttachments(Model $rattachable, array $targets): Collection`
 
+Synchronise les rattachements d'un modèle avec une liste de cibles.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$rattachable` | `Model` | Modèle à synchroniser |
-| `$targets` | `array` | Tableau des cibles avec rôles et métadonnées |
+| `$targets` | `array<array{target: Model, role?: EnumerableInterface, metadata?: array<string, mixed>}>` | Cibles avec rôles optionnels |
 
-**Format de `$targets` :**
-```php
-[
-    [
-        'target' => $hospital,        // Model (requis)
-        'role' => Role::DOCTOR,       // EnumerableInterface (optionnel)
-        'metadata' => ['key' => 'value'], // array (optionnel)
-    ],
-    // ...
-]
-```
+**Retourne :** `Collection<int, Model>` - Rattachements créés ou mis à jour
 
-**Retourne :** `Collection<Model>` - Rattachements créés ou mis à jour
+**Exceptions :** 
+- `RuntimeException` - Si une cible est invalide
+- `RuntimeException` - Si les contraintes sont violées
 
 **Fonctionnement :**
 1. Crée les nouveaux rattachements
 2. Met à jour les rattachements existants
 3. Supprime les rattachements non inclus
 
-**Exceptions :** 
-- `RuntimeException` - Si un target n'a pas la clé "target"
-- `RuntimeException` - Si les contraintes sont violées
-
 ---
 
 ## Cas d'utilisation
 
-### Cas 1 : Rattachement simple avec rôle
+### Cas 1 : Gestion des médecins et hôpitaux
 
 ```php
-$rattachmentService->attach($doctor, $hospital, ApplicationRole::DOCTOR, [
+$rattachmentService->attach($doctor, $hospital, Role::DOCTOR, [
     'consultation_days' => ['monday', 'wednesday', 'friday'],
     'consultation_hours' => '09:00-17:00',
 ]);
+
+$hospitals = $rattachmentService->getTargetsByRole($doctor, Role::DOCTOR);
+$doctors = $rattachmentService->getRattachablesByRole($hospital, Role::DOCTOR);
 ```
 
 ### Cas 2 : Rattachement sans rôle
@@ -471,21 +627,7 @@ $rattachmentService->attach($user, $post, null, [
 ]);
 ```
 
-### Cas 3 : Contrainte unique
-
-```php
-// Dans Hospital.php
-public function uniqueTargets(): array
-{
-    return [User::class]; // Un hôpital ne peut avoir qu'un seul directeur
-}
-
-// Utilisation
-$rattachmentService->attach($hospital, $user1, Role::ADMIN); // ✅ OK
-$rattachmentService->attach($hospital, $user2, Role::ADMIN); // ❌ Exception
-```
-
-### Cas 4 : Synchronisation en masse
+### Cas 3 : Synchronisation en masse
 
 ```php
 $rattachmentService->syncAttachments($doctor, [
@@ -495,20 +637,20 @@ $rattachmentService->syncAttachments($doctor, [
 ]);
 ```
 
-### Cas 5 : Pagination des rattachements
+### Cas 4 : Filtrage par type et rôle
 
 ```php
-$paginator = $rattachmentService->getRattachablesPaginated($hospital, 15, 1);
-foreach ($paginator as $rattachable) {
-    echo $rattachable->name;
-}
-```
+$hospitals = $rattachmentService->getTargetsByTypeAndRole(
+    $doctor, 
+    Hospital::class, 
+    Role::DOCTOR
+);
 
-### Cas 6 : Récupération des rôles distincts
-
-```php
-$roles = $rattachmentService->getDistinctRolesForTarget($hospital);
-// Collection ['doctor', 'staff', 'admin']
+$targets = $rattachmentService->getTargetsByTypesAndRoles(
+    $doctor, 
+    [Hospital::class, Pharmacy::class], 
+    [Role::DOCTOR, Role::PHARMACIST]
+);
 ```
 
 ## Gestion des erreurs
@@ -517,20 +659,10 @@ $roles = $rattachmentService->getDistinctRolesForTarget($hospital);
 |-----------|-----------|---------|
 | Rattachement déjà existant | `RuntimeException` | `{rattachable} {rattachable_id} is already attached to {target} {target_id}` |
 | Rattachement inexistant (detach) | `RuntimeException` | `{rattachable} {rattachable_id} is not attached to {target} {target_id}` |
-| Target non autorisé (contraintes) | `RuntimeException` | `{rattachable} cannot be attached to {target}. Allowed targets: {allowed_targets}` |
-| Rôle non autorisé (contraintes) | `RuntimeException` | `Role "{role}" is not allowed for {rattachable} -> {target}. Allowed roles: {allowed_roles}` |
+| Target non autorisé | `RuntimeException` | `{rattachable} cannot be attached to {target}. Allowed targets: {allowed_targets}` |
+| Rôle non autorisé | `RuntimeException` | `Role "{role}" is not allowed for {rattachable} -> {target}. Allowed roles: {allowed_roles}` |
 | Contrainte unique violée | `RuntimeException` | `{rattachable} already has a unique attachment to {targetClass}. Only one {targetClass} is allowed.` |
 | Données `syncAttachments` invalides | `RuntimeException` | `Each target must have "target" key` |
-
-## Intégration
-
-Le service s'intègre avec :
-
-- **`RattachmentRepository`** - Pour les opérations d'accès aux données
-- **`RattachmentConstraintsInterface`** - Pour les contraintes de rattachement
-- **`EnumerableInterface`** - Pour les rôles
-- **`RattachmentFilterRecord`** - Pour les filtres
-- **`RattachmentRecord`** - Pour les DTOs
 
 ## Performance
 
@@ -571,13 +703,14 @@ $service->attach($doctor, $hospital, ApplicationRole::DOCTOR);
 $service->attach($doctor, $specialty, ApplicationRole::SPECIALIST);
 
 // 3. Récupérer tous les hôpitaux d'un docteur
-$hospitals = $service->getTargetsByRole($doctor, ApplicationRole::DOCTOR);
-foreach ($hospitals as $hospital) {
-    echo $hospital->name . "\n";
-}
+$hospitals = $service->getTargetsByType($doctor, Hospital::class);
 
-// 4. Récupérer tous les docteurs d'un hôpital
-$doctors = $service->getRattachablesByRole($hospital, ApplicationRole::DOCTOR);
+// 4. Récupérer les hôpitaux où le docteur est médecin
+$hospitals = $service->getTargetsByTypeAndRole(
+    $doctor, 
+    Hospital::class, 
+    ApplicationRole::DOCTOR
+);
 
 // 5. Synchroniser tous les rattachements
 $service->syncAttachments($doctor, [
@@ -586,7 +719,7 @@ $service->syncAttachments($doctor, [
 ]);
 
 // 6. Compter les rattachements
-$count = $service->countTargetsByRole($doctor, ApplicationRole::DOCTOR);
+$count = $service->countTargets($doctor);
 
 // 7. Supprimer un rattachement
 $service->detach($doctor, $hospital);
@@ -599,7 +732,6 @@ $service->detachAll($doctor);
 
 - `Rattachment` - Modèle Eloquent du rattachement
 - `RattachmentRepository` - Accès aux données
-- `RattachmentConstraintsInterface` - Interface pour les contraintes
+- `RattachmentConstraintsInterface` - Interface des contraintes
 - `ApplicationRole` - Énumération des rôles
-- `RattachmentFilterRecord` - DTO de filtrage
-- `RattachmentRecord` - DTO de création/mise à jour
+- `HasRattachments` - Trait pour les modèles

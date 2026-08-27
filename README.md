@@ -13,18 +13,10 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Extensibilité](#extensibilité)
-- [Utilisation](#utilisation)
-  - [Créer un rattachement](#créer-un-rattachement)
-  - [Supprimer un rattachement](#supprimer-un-rattachement)
-  - [Vérifier un rattachement](#vérifier-un-rattachement)
-  - [Récupérer les rattachements](#récupérer-les-rattachements)
-  - [Mettre à jour un rattachement](#mettre-à-jour-un-rattachement)
-  - [Synchroniser les rattachements](#synchroniser-les-rattachements)
-  - [Filtrer et compter](#filtrer-et-compter)
+- [Utilisation avec le service](#utilisation-avec-le-service)
+- [Utilisation avec le trait](#utilisation-avec-le-trait)
 - [Rôles par défaut](#rôles-par-défaut)
 - [Système de contraintes](#système-de-contraintes)
-  - [Contraintes de cibles autorisées](#contraintes-de-cibles-autorisées)
-  - [Contraintes uniques](#contraintes-uniques)
 - [Référence de l'API](#référence-de-lapi)
 - [Value Objects](#value-objects)
 - [Structure de la base de données](#structure-de-la-base-de-données)
@@ -41,6 +33,8 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - ✅ **Système de contraintes** - Limitez les rattachements possibles par modèle et rôle
 - ✅ **Contraintes uniques** - Limitez un modèle à un seul rattachement par type de cible
 - ✅ **Métadonnées flexibles** - Stockez des données supplémentaires au format JSON
+- ✅ **Trait HasRattachments** - API fluide directement dans vos modèles
+- ✅ **Filtrage avancé** - Filtrer par type, rôle, ou combinaison des deux
 - ✅ **Pattern Repository** - Séparation propre de la logique d'accès aux données
 - ✅ **Support des DTOs** - Objets de transfert de données typés
 - ✅ **Value Objects** - Métadonnées typées avec `StrictDataObject`
@@ -207,7 +201,7 @@ $service->updateRole($user, $hospital, CustomRole::ADMIN);
 
 ---
 
-## 📖 Utilisation
+## 📖 Utilisation avec le service
 
 ### Créer un rattachement
 
@@ -230,14 +224,6 @@ class DoctorController extends Controller
                 'consultation_days' => ['monday', 'wednesday', 'friday'],
                 'consultation_hours' => '09:00-17:00',
             ]
-        );
-
-        // Rattachement sans rôle
-        $attachment = $service->attach(
-            $doctor,
-            $hospital,
-            null,                   // Pas de rôle
-            ['type' => 'visitor']
         );
 
         return response()->json([
@@ -285,9 +271,6 @@ $isAttached = $service->isAttached($doctor, $hospital);
 
 // Vérifier si un rôle existe pour une cible
 $hasDoctors = $service->hasRoleAttached($hospital, Role::DOCTOR);
-
-// Vérifier si un rattachement existe entre deux modèles spécifiques
-$exists = $service->hasAttachmentsBetween($doctor, $hospital);
 ```
 
 ### Récupérer les rattachements
@@ -302,8 +285,18 @@ $doctors = $service->getRattachablesByRole($hospital, Role::DOCTOR);
 // Récupérer toutes les cibles d'un modèle
 $hospitals = $service->getTargets($doctor);
 
-// Récupérer les cibles avec un rôle spécifique
-$hospitals = $service->getTargetsByRole($doctor, Role::DOCTOR);
+// Récupérer les cibles d'un type spécifique
+$hospitals = $service->getTargetsByType($doctor, Hospital::class);
+
+// Récupérer les cibles par type et rôle
+$hospitals = $service->getTargetsByTypeAndRole($doctor, Hospital::class, Role::DOCTOR);
+
+// Récupérer les cibles de plusieurs types avec plusieurs rôles
+$targets = $service->getTargetsByTypesAndRoles(
+    $doctor,
+    [Hospital::class, Pharmacy::class],
+    [Role::DOCTOR, Role::PHARMACIST]
+);
 ```
 
 ### Mettre à jour un rattachement
@@ -342,23 +335,70 @@ $attachments = $service->syncAttachments($doctor, [
         'role' => Role::PHARMACIST,
     ],
 ]);
-
-// Les rattachements précédents (ex: hospital3) seront automatiquement supprimés
 ```
 
-### Filtrer et compter
+---
+
+## 📖 Utilisation avec le trait
+
+Le package fournit un trait `HasRattachments` qui permet une API fluide directement dans vos modèles.
+
+### Ajouter le trait à votre modèle
 
 ```php
-// Compter les rattachements
-$total = $service->countRattachables($hospital);
-$doctorsCount = $service->countRattachablesByRole($hospital, Role::DOCTOR);
+<?php
 
-// Récupérer les rôles distincts
-$roles = $service->getDistinctRolesForTarget($hospital);
+declare(strict_types=1);
 
-// Pagination
-$paginator = $service->getRattachablesPaginated($hospital, 15, 1);
-$paginator = $service->getTargetsPaginated($doctor, 15, 1);
+namespace App\Models;
+
+use AndyDefer\LaravelRattachments\Traits\HasRattachments;
+use Illuminate\Database\Eloquent\Model;
+
+final class Doctor extends Model
+{
+    use HasRattachments;
+}
+```
+
+### Utilisation
+
+```php
+$doctor = Doctor::find(1);
+$hospital = Hospital::find(1);
+
+// Rattacher
+$doctor->attachTo($hospital, Role::DOCTOR, [
+    'consultation_days' => ['monday', 'wednesday', 'friday'],
+]);
+
+// Vérifier
+if ($doctor->isAttachedTo($hospital)) {
+    // ...
+}
+
+// Récupérer les cibles
+$hospitals = $doctor->getTargets();
+$hospitals = $doctor->getTargetsByRole(Role::DOCTOR);
+$hospitals = $doctor->getTargetsByType(Hospital::class);
+$hospitals = $doctor->getTargetsByTypeAndRole(Hospital::class, Role::DOCTOR);
+
+// Compter
+$count = $doctor->countTargetsByRole(Role::DOCTOR);
+
+// Mettre à jour
+$doctor->updateRoleFor($hospital, Role::ADMIN);
+$doctor->mergeMetadataFor($hospital, ['primary' => true]);
+
+// Synchroniser
+$doctor->syncAttachments([
+    ['target' => Hospital::find(1), 'role' => Role::DOCTOR],
+    ['target' => Hospital::find(2), 'role' => Role::DOCTOR],
+]);
+
+// Détacher
+$doctor->detachFrom($hospital);
+$doctor->detachAll();
 ```
 
 ---
@@ -415,21 +455,21 @@ final class User extends Model implements RattachmentConstraintsInterface
 
 **Résultat :**
 ```php
-// ✅ OK - User peut être rattaché à Hospital avec rôle DOCTOR
+// ✅ OK
 $service->attach($user, $hospital, Role::DOCTOR);
 
-// ❌ ERREUR - User ne peut pas être rattaché à Pharmacy avec rôle DOCTOR
+// ❌ ERREUR - Rôle non autorisé
 $service->attach($user, $pharmacy, Role::DOCTOR);
 // RuntimeException: Role "Médecin" is not allowed for User -> Pharmacy. Allowed roles: Pharmacien, Personnel
 
-// ❌ ERREUR - User ne peut pas être rattaché à Specialty (non autorisé)
+// ❌ ERREUR - Target non autorisé
 $service->attach($user, $specialty, Role::HAS_SPECIALTY);
 // RuntimeException: User cannot be attached to Specialty. Allowed targets: Hospital, Pharmacy
 ```
 
 ### Contraintes uniques
 
-Permet de limiter un modèle à un seul rattachement par type de cible. Utile pour des relations "one-to-one".
+Permet de limiter un modèle à un seul rattachement par type de cible.
 
 ```php
 <?php
@@ -455,7 +495,7 @@ final class Hospital extends Model implements RattachmentConstraintsInterface
     public function uniqueTargets(): array
     {
         return [
-            User::class,     // Un hôpital ne peut avoir qu'un seul directeur (User avec rôle ADMIN)
+            User::class,     // Un hôpital ne peut avoir qu'un seul directeur
             Pharmacy::class, // Un hôpital ne peut avoir qu'une seule pharmacie principale
         ];
     }
@@ -464,22 +504,16 @@ final class Hospital extends Model implements RattachmentConstraintsInterface
 
 **Résultat :**
 ```php
-// ✅ OK - Premier rattachement vers User autorisé
+// ✅ OK - Premier rattachement
 $service->attach($hospital, $user1, Role::ADMIN);
 
-// ❌ ERREUR - Deuxième rattachement vers User refusé (contrainte unique)
+// ❌ ERREUR - Deuxième rattachement (contrainte unique)
 $service->attach($hospital, $user2, Role::ADMIN);
 // RuntimeException: Hospital already has a unique attachment to User. Only one User is allowed.
 
-// ✅ OK - Rattachement vers Pharmacy autorisé (type de target différent)
+// ✅ OK - Type de target différent
 $service->attach($hospital, $pharmacy, Role::SUPPLIER);
 ```
-
-**La contrainte est unidirectionnelle :**
-- Un `Hospital` ne peut avoir qu'un seul `User` (si défini dans Hospital)
-- Un `User` peut avoir plusieurs `Hospital` (pas de contrainte du côté User)
-
-Pour une contrainte bidirectionnelle, les deux modèles doivent implémenter `uniqueTargets()`.
 
 ---
 
@@ -489,65 +523,52 @@ Pour une contrainte bidirectionnelle, les deux modèles doivent implémenter `un
 
 | Méthode | Description | Retourne |
 |---------|-------------|----------|
-| `attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = [])` | Crée un rattachement | `Model` |
-| `attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = [])` | Rattache plusieurs modèles à une cible | `Collection` |
-| `attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = [])` | Rattache un modèle à plusieurs cibles | `Collection` |
-| `detach(Model $rattachable, Model $target)` | Supprime un rattachement | `void` |
-| `detachMultiple(Collection $rattachables, Model $target)` | Supprime plusieurs rattachements | `void` |
-| `detachFromMultiple(Model $rattachable, Collection $targets)` | Supprime les rattachements d'un modèle vers plusieurs cibles | `void` |
-| `detachAll(Model $model)` | Supprime tous les rattachements d'un modèle | `void` |
-| `isAttached(Model $rattachable, Model $target)` | Vérifie si un modèle est rattaché | `bool` |
-| `hasRoleAttached(Model $target, EnumerableInterface $role)` | Vérifie si un rôle existe pour une cible | `bool` |
-| `getRattachables(Model $target)` | Récupère tous les modèles rattachés à une cible | `Collection` |
-| `getRattachablesPaginated(Model $target, int $perPage = 15, int $page = 1)` | Récupère les modèles rattachés paginés | `LengthAwarePaginator` |
-| `getTargets(Model $rattachable)` | Récupère toutes les cibles d'un modèle | `Collection` |
-| `getTargetsPaginated(Model $rattachable, int $perPage = 15, int $page = 1)` | Récupère les cibles paginées | `LengthAwarePaginator` |
-| `getRattachablesByRole(Model $target, EnumerableInterface $role)` | Récupère les modèles rattachés par rôle | `Collection` |
-| `getRattachablesByRolePaginated(Model $target, EnumerableInterface $role, int $perPage = 15, int $page = 1)` | Récupère les modèles rattachés par rôle paginés | `LengthAwarePaginator` |
-| `getTargetsByRole(Model $rattachable, EnumerableInterface $role)` | Récupère les cibles par rôle | `Collection` |
-| `getTargetsByRolePaginated(Model $rattachable, EnumerableInterface $role, int $perPage = 15, int $page = 1)` | Récupère les cibles par rôle paginées | `LengthAwarePaginator` |
-| `countRattachables(Model $target)` | Compte les rattachements d'une cible | `int` |
-| `countTargets(Model $rattachable)` | Compte les cibles d'un modèle | `int` |
-| `countRattachablesByRole(Model $target, EnumerableInterface $role)` | Compte les rattachements par rôle | `int` |
-| `countTargetsByRole(Model $rattachable, EnumerableInterface $role)` | Compte les cibles par rôle | `int` |
-| `getDistinctRolesForTarget(Model $target)` | Récupère les rôles distincts d'une cible | `Collection` |
-| `getDistinctRolesForRattachable(Model $rattachable)` | Récupère les rôles distincts d'un modèle | `Collection` |
-| `updateRole(Model $rattachable, Model $target, EnumerableInterface $role)` | Met à jour le rôle | `void` |
-| `updateRoleForMultiple(Collection $rattachables, Model $target, EnumerableInterface $role)` | Met à jour le rôle de plusieurs rattachements | `void` |
-| `updateMetadata(Model $rattachable, Model $target, array $metadata)` | Met à jour les métadonnées | `void` |
-| `mergeMetadata(Model $rattachable, Model $target, array $metadata)` | Fusionne les métadonnées | `void` |
-| `getAttachment(Model $rattachable, Model $target)` | Récupère un rattachement spécifique | `?Model` |
-| `hasAttachmentsBetween(Model $rattachable, Model $target)` | Vérifie l'existence d'un rattachement entre deux modèles | `bool` |
-| `hasAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Vérifie l'existence de rattachements entre types | `bool` |
-| `getAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Récupère les rattachements entre types | `Collection` |
-| `deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Supprime tous les rattachements entre types | `int` |
-| `syncAttachments(Model $rattachable, array $targets)` | Synchronise les rattachements | `Collection` |
+| `attach()` | Crée un rattachement | `Model` |
+| `attachMultiple()` | Rattache plusieurs modèles à une cible | `Collection` |
+| `attachToMultiple()` | Rattache un modèle à plusieurs cibles | `Collection` |
+| `detach()` | Supprime un rattachement | `void` |
+| `detachMultiple()` | Supprime plusieurs rattachements | `void` |
+| `detachFromMultiple()` | Supprime les rattachements d'un modèle vers plusieurs cibles | `void` |
+| `detachAll()` | Supprime tous les rattachements d'un modèle | `void` |
+| `isAttached()` | Vérifie si un modèle est rattaché | `bool` |
+| `hasRoleAttached()` | Vérifie si un rôle existe pour une cible | `bool` |
+| `getRattachables()` | Récupère tous les modèles rattachés à une cible | `Collection` |
+| `getRattachablesPaginated()` | Récupère les modèles rattachés paginés | `LengthAwarePaginator` |
+| `getTargets()` | Récupère toutes les cibles d'un modèle | `Collection` |
+| `getTargetsPaginated()` | Récupère les cibles paginées | `LengthAwarePaginator` |
+| `getRattachablesByRole()` | Récupère les modèles rattachés par rôle | `Collection` |
+| `getRattachablesByRolePaginated()` | Récupère les modèles rattachés par rôle paginés | `LengthAwarePaginator` |
+| `getTargetsByRole()` | Récupère les cibles par rôle | `Collection` |
+| `getTargetsByRolePaginated()` | Récupère les cibles par rôle paginées | `LengthAwarePaginator` |
+| `getTargetsByType()` | Récupère les cibles d'un type spécifique | `Collection` |
+| `getTargetsByTypePaginated()` | Récupère les cibles d'un type paginées | `LengthAwarePaginator` |
+| `getTargetsByTypeAndRole()` | Récupère les cibles par type et rôle | `Collection` |
+| `getTargetsByTypeAndRoles()` | Récupère les cibles par type et plusieurs rôles | `Collection` |
+| `getTargetsByTypesAndRoles()` | Récupère les cibles par plusieurs types et rôles | `Collection` |
+| `countRattachables()` | Compte les rattachements d'une cible | `int` |
+| `countTargets()` | Compte les cibles d'un modèle | `int` |
+| `countRattachablesByRole()` | Compte les rattachements par rôle | `int` |
+| `countTargetsByRole()` | Compte les cibles par rôle | `int` |
+| `getDistinctRolesForTarget()` | Récupère les rôles distincts d'une cible | `Collection` |
+| `getDistinctRolesForRattachable()` | Récupère les rôles distincts d'un modèle | `Collection` |
+| `updateRole()` | Met à jour le rôle | `void` |
+| `updateRoleForMultiple()` | Met à jour le rôle de plusieurs rattachements | `void` |
+| `updateMetadata()` | Met à jour les métadonnées | `void` |
+| `mergeMetadata()` | Fusionne les métadonnées | `void` |
+| `getAttachment()` | Récupère un rattachement spécifique | `?Model` |
+| `hasAttachmentsBetween()` | Vérifie l'existence d'un rattachement entre deux modèles | `bool` |
+| `hasAttachmentsBetweenTypes()` | Vérifie l'existence de rattachements entre types | `bool` |
+| `getAttachmentsBetweenTypes()` | Récupère les rattachements entre types | `Collection` |
+| `deleteAllAttachmentsBetweenTypes()` | Supprime tous les rattachements entre types | `int` |
+| `syncAttachments()` | Synchronise les rattachements | `Collection` |
 
 ---
 
 ## 🎯 Value Objects
 
-Le package supporte les Value Objects suivants :
-
 | Value Object | Description | Exemple |
 |--------------|-------------|---------|
 | `StrictDataObject` | Métadonnées typées | `StrictDataObject::from(['key' => 'value'])` |
-
-### Accesseurs dans le modèle Rattachment
-
-```php
-$attachment = Rattachment::find(1);
-
-// ✅ Accès via les accesseurs Eloquent (propriétés directement)
-$createdAt = $attachment->created_at;       // Carbon
-$updatedAt = $attachment->updated_at;       // Carbon
-$metadata = $attachment->metadata;          // StrictDataObject|null
-$role = $attachment->role;                  // EnumerableInterface (votre enum)
-
-// ✅ Relations
-$rattachable = $attachment->rattachable;    // Modèle rattaché (User, Doctor, etc.)
-$target = $attachment->target;              // Modèle cible (Hospital, Pharmacy, etc.)
-```
 
 ---
 
@@ -556,12 +577,12 @@ $target = $attachment->target;              // Modèle cible (Hospital, Pharmacy
 ```sql
 CREATE TABLE rattachments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    rattachable_type VARCHAR(255) NOT NULL, -- Type du modèle rattaché
-    rattachable_id BIGINT UNSIGNED NOT NULL,-- ID du modèle rattaché
-    target_type VARCHAR(255) NOT NULL,      -- Type du modèle cible
-    target_id BIGINT UNSIGNED NOT NULL,     -- ID du modèle cible
-    role VARCHAR(50) NULL,                  -- Rôle (valeur de votre enum, nullable)
-    metadata JSON NULL,                     -- Métadonnées
+    rattachable_type VARCHAR(255) NOT NULL,
+    rattachable_id BIGINT UNSIGNED NOT NULL,
+    target_type VARCHAR(255) NOT NULL,
+    target_id BIGINT UNSIGNED NOT NULL,
+    role VARCHAR(50) NULL,
+    metadata JSON NULL,
     created_at TIMESTAMP NULL,
     updated_at TIMESTAMP NULL,
     
@@ -572,7 +593,7 @@ CREATE TABLE rattachments (
 );
 ```
 
-> **Note :** La colonne `role` est maintenant nullable pour permettre des rattachements sans rôle.
+> **Note :** La colonne `role` est nullable pour permettre des rattachements sans rôle.
 
 ---
 
@@ -585,128 +606,35 @@ declare(strict_types=1);
 
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
 use AndyDefer\LaravelRattachments\Enums\Role;
-use App\Models\User;
+use App\Models\Doctor;
 use App\Models\Hospital;
 use App\Models\Pharmacy;
 
-class HospitalController extends Controller
-{
-    public function __construct(
-        private readonly RattachmentService $service
-    ) {}
+// Avec le service
+$service = app(RattachmentService::class);
+$doctor = Doctor::find(1);
 
-    public function attachDoctor(Request $request, Hospital $hospital)
-    {
-        $doctor = User::find($request->input('doctor_id'));
+$service->attach($doctor, Hospital::find(1), Role::DOCTOR);
+$hospitals = $service->getTargetsByType($doctor, Hospital::class);
 
-        $attachment = $this->service->attach(
-            $doctor,
-            $hospital,
-            Role::DOCTOR,
-            [
-                'consultation_days' => $request->input('days', ['monday', 'wednesday']),
-                'consultation_hours' => $request->input('hours', '09:00-17:00'),
-                'department' => $request->input('department'),
-            ]
-        );
+// Avec le trait
+$doctor->attachTo(Hospital::find(2), Role::DOCTOR);
+$allHospitals = $doctor->getTargetsByRole(Role::DOCTOR);
 
-        return response()->json([
-            'message' => 'Médecin rattaché avec succès',
-            'attachment' => $attachment,
-        ]);
-    }
-
-    public function getDoctors(Hospital $hospital)
-    {
-        $doctors = $this->service->getRattachablesByRolePaginated(
-            $hospital,
-            Role::DOCTOR,
-            15,
-            $request->input('page', 1)
-        );
-
-        return response()->json($doctors);
-    }
-
-    public function syncDoctor(Request $request, Hospital $hospital)
-    {
-        $doctor = User::find($request->input('doctor_id'));
-
-        $attachments = $this->service->syncAttachments($doctor, [
-            [
-                'target' => $hospital,
-                'role' => Role::DOCTOR,
-                'metadata' => ['primary' => true],
-            ],
-            [
-                'target' => Pharmacy::find($request->input('pharmacy_id')),
-                'role' => Role::PHARMACIST,
-            ],
-        ]);
-
-        return response()->json([
-            'message' => 'Rattachements synchronisés',
-            'attachments' => $attachments,
-        ]);
-    }
-
-    public function stats(Hospital $hospital)
-    {
-        return response()->json([
-            'total_doctors' => $this->service->countRattachablesByRole($hospital, Role::DOCTOR),
-            'total_staff' => $this->service->countRattachablesByRole($hospital, Role::STAFF),
-            'distinct_roles' => $this->service->getDistinctRolesForTarget($hospital),
-        ]);
-    }
-
-    public function detachDoctor(Request $request, Hospital $hospital)
-    {
-        $doctor = User::find($request->input('doctor_id'));
-
-        $this->service->detach($doctor, $hospital);
-
-        return response()->json([
-            'message' => 'Médecin détaché avec succès',
-        ]);
-    }
-}
+// Synchronisation
+$doctor->syncAttachments([
+    ['target' => Hospital::find(1), 'role' => Role::DOCTOR, 'metadata' => ['primary' => true]],
+    ['target' => Pharmacy::find(1), 'role' => Role::PHARMACIST],
+]);
 ```
 
 ---
 
 ## 🧪 Tests
 
-### Exécuter les tests
-
 ```bash
 composer test
-```
-
-### Exécuter uniquement les tests d'intégration
-
-```bash
 composer test-integration
-```
-
-### Configuration des tests
-
-Le package utilise `orchestra/testbench` pour les tests d'intégration avec une base de données SQLite en mémoire.
-
----
-
-## 🔧 Développement
-
-### Style de code
-
-```bash
-./vendor/bin/pint
-```
-
-### Analyse statique
-
-```bash
-./vendor/bin/phpstan analyse
-./vendor/bin/psalm
 ```
 
 ---
@@ -715,7 +643,7 @@ Le package utilise `orchestra/testbench` pour les tests d'intégration avec une 
 
 - [`andydefer/php-vo`](https://github.com/andydefer/php-vo) - Value Objects
 - [`andydefer/laravel-repository`](https://github.com/andydefer/laravel-repository) - Pattern Repository et Enum Casts
-- [`andydefer/domain-structures`](https://github.com/andydefer/domain-structures) - Structures de domaine (AbstractRecord, AbstractData, StrictDataObject)
+- [`andydefer/domain-structures`](https://github.com/andydefer/domain-structures) - Structures de domaine
 
 ---
 
@@ -729,13 +657,7 @@ Le package utilise `orchestra/testbench` pour les tests d'intégration avec une 
 
 ## 📄 Licence
 
-Ce package est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus d'informations.
-
----
-
-## ⭐ Support
-
-Si vous trouvez ce package utile, n'hésitez pas à lui donner une ⭐ sur GitHub !
+MIT © [Andy Defer](https://github.com/andydefer)
 
 ---
 

@@ -8,68 +8,66 @@ use AndyDefer\Repository\Contracts\EnumerableInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use RuntimeException;
 
 /**
- * Interface RattachmentServiceInterface
+ * Service interface for managing polymorphic attachments between Eloquent models.
  *
- * Service interface for managing polymorphic attachments (rattachments).
- * Provides methods for attaching, detaching, and querying relationships
+ * Provides a complete API for attaching, detaching, and querying relationships
  * between any two models with optional roles and metadata.
  */
 interface RattachmentServiceInterface
 {
     /**
-     * Attach a model to another model with an optional role and metadata.
+     * Attaches a model to another model with an optional role and metadata.
      *
-     * @param  Model  $rattachable  The model being attached (e.g., User, Doctor)
+     * @param  Model  $rattachable  The model to attach (e.g., User, Doctor)
      * @param  Model  $target  The target model to attach to (e.g., Hospital, Pharmacy)
      * @param  EnumerableInterface|null  $role  The role of the attachment (optional)
-     * @param  array  $metadata  Additional metadata for the attachment
+     * @param  array<string, mixed>  $metadata  Additional metadata for the attachment
      * @return Model The created rattachment model
      *
-     * @throws RuntimeException If the attachment already exists
+     * @throws \RuntimeException If the attachment already exists or constraints are violated
      */
     public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model;
 
     /**
-     * Attach multiple models to a target model with an optional role and metadata.
+     * Attaches multiple models to a single target with an optional role and metadata.
      *
      * @param  Collection<int, Model>  $rattachables  Collection of models to attach
      * @param  Model  $target  The target model
      * @param  EnumerableInterface|null  $role  The role for all attachments (optional)
-     * @param  array  $metadata  Additional metadata for all attachments
+     * @param  array<string, mixed>  $metadata  Additional metadata for all attachments
      * @return Collection<int, Model> Collection of created rattachment models
      *
-     * @throws RuntimeException If any attachment already exists
+     * @throws \RuntimeException If any attachment already exists or constraints are violated
      */
     public function attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection;
 
     /**
-     * Attach a model to multiple targets with an optional role and metadata.
+     * Attaches a single model to multiple targets with an optional role and metadata.
      *
      * @param  Model  $rattachable  The model to attach
      * @param  Collection<int, Model>  $targets  Collection of target models
      * @param  EnumerableInterface|null  $role  The role for all attachments (optional)
-     * @param  array  $metadata  Additional metadata for all attachments
+     * @param  array<string, mixed>  $metadata  Additional metadata for all attachments
      * @return Collection<int, Model> Collection of created rattachment models
      *
-     * @throws RuntimeException If any attachment already exists
+     * @throws \RuntimeException If any attachment already exists or constraints are violated
      */
     public function attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection;
 
     /**
-     * Detach a model from another model.
+     * Detaches a model from another model.
      *
      * @param  Model  $rattachable  The model being detached
      * @param  Model  $target  The target model to detach from
      *
-     * @throws RuntimeException If the attachment does not exist
+     * @throws \RuntimeException If the attachment does not exist
      */
     public function detach(Model $rattachable, Model $target): void;
 
     /**
-     * Detach multiple models from a target model.
+     * Detaches multiple models from a target model.
      *
      * @param  Collection<int, Model>  $rattachables  Collection of models to detach
      * @param  Model  $target  The target model
@@ -77,7 +75,7 @@ interface RattachmentServiceInterface
     public function detachMultiple(Collection $rattachables, Model $target): void;
 
     /**
-     * Detach a model from multiple targets.
+     * Detaches a model from multiple targets.
      *
      * @param  Model  $rattachable  The model to detach
      * @param  Collection<int, Model>  $targets  Collection of target models
@@ -85,14 +83,14 @@ interface RattachmentServiceInterface
     public function detachFromMultiple(Model $rattachable, Collection $targets): void;
 
     /**
-     * Detach a model from all its attachments (both as rattachable and target).
+     * Detaches a model from all its attachments (both as rattachable and target).
      *
      * @param  Model  $model  The model to detach from all attachments
      */
     public function detachAll(Model $model): void;
 
     /**
-     * Check if a model is attached to another model.
+     * Checks if a model is attached to another model.
      *
      * @param  Model  $rattachable  The model being checked
      * @param  Model  $target  The target model
@@ -101,7 +99,7 @@ interface RattachmentServiceInterface
     public function isAttached(Model $rattachable, Model $target): bool;
 
     /**
-     * Check if any model is attached to a target with a specific role.
+     * Checks if any model is attached to a target with a specific role.
      *
      * @param  Model  $target  The target model
      * @param  EnumerableInterface  $role  The role to check
@@ -110,15 +108,45 @@ interface RattachmentServiceInterface
     public function hasRoleAttached(Model $target, EnumerableInterface $role): bool;
 
     /**
-     * Get all models attached to a target model.
+     * Retrieves all models attached to a target model.
      *
-     * @param  Model  $target  The target model (e.g., Hospital)
+     * @param  Model  $target  The target model
      * @return Collection<int, Model> Collection of attached models
      */
     public function getRattachables(Model $target): Collection;
 
     /**
-     * Get all models attached to a target model with pagination.
+     * Retrieves all targets of a specific type and role attached to a model.
+     *
+     * @param  Model  $rattachable  The model
+     * @param  string  $targetClass  The target class FQCN
+     * @param  EnumerableInterface  $role  The role to filter by
+     * @return Collection<int, Model> Collection of target models
+     */
+    public function getTargetsByTypeAndRole(Model $rattachable, string $targetClass, EnumerableInterface $role): Collection;
+
+    /**
+     * Retrieves all targets of a specific type with multiple roles attached to a model.
+     *
+     * @param  Model  $rattachable  The model
+     * @param  string  $targetClass  The target class FQCN
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles to filter by
+     * @return Collection<int, Model> Collection of target models
+     */
+    public function getTargetsByTypeAndRoles(Model $rattachable, string $targetClass, array $roles): Collection;
+
+    /**
+     * Retrieves all targets of multiple types with multiple roles attached to a model.
+     *
+     * @param  Model  $rattachable  The model
+     * @param  array<int, string>  $targetClasses  Array of target class FQCNs
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles to filter by
+     * @return Collection<int, Model> Collection of target models
+     */
+    public function getTargetsByTypesAndRoles(Model $rattachable, array $targetClasses, array $roles): Collection;
+
+    /**
+     * Retrieves all models attached to a target model with pagination.
      *
      * @param  Model  $target  The target model
      * @param  int  $perPage  Items per page
@@ -128,15 +156,15 @@ interface RattachmentServiceInterface
     public function getRattachablesPaginated(Model $target, int $perPage = 15, int $page = 1): LengthAwarePaginator;
 
     /**
-     * Get all targets a model is attached to.
+     * Retrieves all targets attached to a model.
      *
-     * @param  Model  $rattachable  The attached model (e.g., User)
+     * @param  Model  $rattachable  The attached model
      * @return Collection<int, Model> Collection of target models
      */
     public function getTargets(Model $rattachable): Collection;
 
     /**
-     * Get all targets a model is attached to with pagination.
+     * Retrieves all targets attached to a model with pagination.
      *
      * @param  Model  $rattachable  The attached model
      * @param  int  $perPage  Items per page
@@ -146,7 +174,7 @@ interface RattachmentServiceInterface
     public function getTargetsPaginated(Model $rattachable, int $perPage = 15, int $page = 1): LengthAwarePaginator;
 
     /**
-     * Get all models attached to a target model with a specific role.
+     * Retrieves all models attached to a target model with a specific role.
      *
      * @param  Model  $target  The target model
      * @param  EnumerableInterface  $role  The role to filter by
@@ -155,7 +183,7 @@ interface RattachmentServiceInterface
     public function getRattachablesByRole(Model $target, EnumerableInterface $role): Collection;
 
     /**
-     * Get all models attached to a target model with a specific role and pagination.
+     * Retrieves all models attached to a target model with a specific role and pagination.
      *
      * @param  Model  $target  The target model
      * @param  EnumerableInterface  $role  The role to filter by
@@ -166,7 +194,27 @@ interface RattachmentServiceInterface
     public function getRattachablesByRolePaginated(Model $target, EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator;
 
     /**
-     * Get all targets a model is attached to with a specific role.
+     * Retrieves all targets of a specific type attached to a model.
+     *
+     * @param  Model  $rattachable  The model
+     * @param  string  $targetClass  The target class FQCN
+     * @return Collection<int, Model> Collection of target models
+     */
+    public function getTargetsByType(Model $rattachable, string $targetClass): Collection;
+
+    /**
+     * Retrieves all targets of a specific type attached to a model with pagination.
+     *
+     * @param  Model  $rattachable  The model
+     * @param  string  $targetClass  The target class FQCN
+     * @param  int  $perPage  Items per page
+     * @param  int  $page  Page number
+     * @return LengthAwarePaginator Paginated results
+     */
+    public function getTargetsByTypePaginated(Model $rattachable, string $targetClass, int $perPage = 15, int $page = 1): LengthAwarePaginator;
+
+    /**
+     * Retrieves all targets attached to a model with a specific role.
      *
      * @param  Model  $rattachable  The attached model
      * @param  EnumerableInterface  $role  The role to filter by
@@ -175,7 +223,7 @@ interface RattachmentServiceInterface
     public function getTargetsByRole(Model $rattachable, EnumerableInterface $role): Collection;
 
     /**
-     * Get all targets a model is attached to with a specific role and pagination.
+     * Retrieves all targets attached to a model with a specific role and pagination.
      *
      * @param  Model  $rattachable  The attached model
      * @param  EnumerableInterface  $role  The role to filter by
@@ -186,7 +234,7 @@ interface RattachmentServiceInterface
     public function getTargetsByRolePaginated(Model $rattachable, EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator;
 
     /**
-     * Count all models attached to a target model.
+     * Counts all models attached to a target model.
      *
      * @param  Model  $target  The target model
      * @return int Total number of attachments
@@ -194,7 +242,7 @@ interface RattachmentServiceInterface
     public function countRattachables(Model $target): int;
 
     /**
-     * Count all targets a model is attached to.
+     * Counts all targets attached to a model.
      *
      * @param  Model  $rattachable  The attached model
      * @return int Total number of targets
@@ -202,7 +250,7 @@ interface RattachmentServiceInterface
     public function countTargets(Model $rattachable): int;
 
     /**
-     * Count models attached to a target with a specific role.
+     * Counts models attached to a target with a specific role.
      *
      * @param  Model  $target  The target model
      * @param  EnumerableInterface  $role  The role to filter by
@@ -211,7 +259,7 @@ interface RattachmentServiceInterface
     public function countRattachablesByRole(Model $target, EnumerableInterface $role): int;
 
     /**
-     * Count targets a model is attached to with a specific role.
+     * Counts targets attached to a model with a specific role.
      *
      * @param  Model  $rattachable  The attached model
      * @param  EnumerableInterface  $role  The role to filter by
@@ -220,34 +268,34 @@ interface RattachmentServiceInterface
     public function countTargetsByRole(Model $rattachable, EnumerableInterface $role): int;
 
     /**
-     * Get all distinct roles for a target model.
+     * Retrieves all distinct roles for a target model.
      *
      * @param  Model  $target  The target model
-     * @return Collection<int, string|EnumerableInterface> Collection of distinct role values
+     * @return Collection<int, EnumerableInterface> Collection of distinct role enums
      */
     public function getDistinctRolesForTarget(Model $target): Collection;
 
     /**
-     * Get all distinct roles for a rattachable model.
+     * Retrieves all distinct roles for a rattachable model.
      *
      * @param  Model  $rattachable  The attached model
-     * @return Collection<int, string|EnumerableInterface> Collection of distinct role values
+     * @return Collection<int, EnumerableInterface> Collection of distinct role enums
      */
     public function getDistinctRolesForRattachable(Model $rattachable): Collection;
 
     /**
-     * Update the role of an existing attachment.
+     * Updates the role of an existing attachment.
      *
      * @param  Model  $rattachable  The attached model
      * @param  Model  $target  The target model
      * @param  EnumerableInterface  $role  The new role
      *
-     * @throws RuntimeException If the attachment does not exist
+     * @throws \RuntimeException If the attachment does not exist or constraints are violated
      */
     public function updateRole(Model $rattachable, Model $target, EnumerableInterface $role): void;
 
     /**
-     * Update the role of multiple attachments.
+     * Updates the role of multiple attachments.
      *
      * @param  Collection<int, Model>  $rattachables  Collection of attached models
      * @param  Model  $target  The target model
@@ -256,29 +304,30 @@ interface RattachmentServiceInterface
     public function updateRoleForMultiple(Collection $rattachables, Model $target, EnumerableInterface $role): void;
 
     /**
-     * Update the metadata of an existing attachment.
+     * Updates the metadata of an existing attachment.
      *
      * @param  Model  $rattachable  The attached model
      * @param  Model  $target  The target model
-     * @param  array  $metadata  The new metadata
+     * @param  array<string, mixed>  $metadata  The new metadata
      *
-     * @throws RuntimeException If the attachment does not exist
+     * @throws \RuntimeException If the attachment does not exist
      */
     public function updateMetadata(Model $rattachable, Model $target, array $metadata): void;
 
     /**
-     * Merge metadata into an existing attachment.
+     * Merges metadata into an existing attachment.
+     * Preserves existing metadata and adds/overwrites with new values.
      *
      * @param  Model  $rattachable  The attached model
      * @param  Model  $target  The target model
-     * @param  array  $metadata  The metadata to merge
+     * @param  array<string, mixed>  $metadata  The metadata to merge
      *
-     * @throws RuntimeException If the attachment does not exist
+     * @throws \RuntimeException If the attachment does not exist
      */
     public function mergeMetadata(Model $rattachable, Model $target, array $metadata): void;
 
     /**
-     * Get a specific attachment between two models.
+     * Retrieves a specific attachment between two models.
      *
      * @param  Model  $rattachable  The attached model
      * @param  Model  $target  The target model
@@ -287,7 +336,7 @@ interface RattachmentServiceInterface
     public function getAttachment(Model $rattachable, Model $target): ?Model;
 
     /**
-     * Check if an attachment exists between two specific models.
+     * Checks if an attachment exists between two specific models.
      *
      * @param  Model  $rattachable  The rattachable model
      * @param  Model  $target  The target model
@@ -296,7 +345,7 @@ interface RattachmentServiceInterface
     public function hasAttachmentsBetween(Model $rattachable, Model $target): bool;
 
     /**
-     * Check if attachments exist between two model types.
+     * Checks if attachments exist between two model types.
      *
      * @param  string  $rattachableType  The morph class of the rattachable model
      * @param  string  $targetType  The morph class of the target model
@@ -305,7 +354,7 @@ interface RattachmentServiceInterface
     public function hasAttachmentsBetweenTypes(string $rattachableType, string $targetType): bool;
 
     /**
-     * Get all attachments between two model types.
+     * Retrieves all attachments between two model types.
      *
      * @param  string  $rattachableType  The morph class of the rattachable model
      * @param  string  $targetType  The morph class of the target model
@@ -314,7 +363,7 @@ interface RattachmentServiceInterface
     public function getAttachmentsBetweenTypes(string $rattachableType, string $targetType): Collection;
 
     /**
-     * Delete all attachments between two model types.
+     * Deletes all attachments between two model types.
      *
      * @param  string  $rattachableType  The morph class of the rattachable model
      * @param  string  $targetType  The morph class of the target model
@@ -323,13 +372,17 @@ interface RattachmentServiceInterface
     public function deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType): int;
 
     /**
-     * Sync attachments for a model with a given set of targets and optional roles.
+     * Synchronizes attachments for a model with a given set of targets and optional roles.
+     *
+     * Creates new attachments, updates existing ones, and removes attachments
+     * that are no longer present in the target list.
      *
      * @param  Model  $rattachable  The attached model
-     * @param  array  $targets  Array of targets with optional roles and metadata
-     *                          Example: [['target' => $hospital, 'role' => 'doctor', 'metadata' => []]]
-     *                          Example: [['target' => $hospital, 'metadata' => ['key' => 'value']]]
+     * @param  array<array{target: Model, role?: EnumerableInterface, metadata?: array<string, mixed>}>  $targets
+     *                                                                                                             Array of targets with optional roles and metadata
      * @return Collection<int, Model> Collection of created/updated attachment models
+     *
+     * @throws \RuntimeException If any target is invalid or constraints are violated
      */
     public function syncAttachments(Model $rattachable, array $targets): Collection;
 }

@@ -17,6 +17,7 @@ use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
 use AndyDefer\Repository\Configs\RepositoryConfig;
 use AndyDefer\Repository\Contracts\Configs\RepositoryConfigInterface;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
@@ -399,6 +400,238 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $attachment = $this->service->getAttachment($this->user, $this->post);
         $this->assertNotNull($attachment);
         $this->assertEquals(Role::DOCTOR, $attachment->role);
+    }
+
+    public function test_get_targets_by_type_and_role_returns_filtered_collection(): void
+    {
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'More content',
+        ]);
+
+        $this->service->attach($this->user, $post, Role::DOCTOR);
+        $this->service->attach($this->user, $post2, Role::ADMIN);
+
+        // Récupérer les TestPost avec rôle DOCTOR
+        $targets = $this->service->getTargetsByTypeAndRole(
+            $this->user,
+            TestPost::class,
+            Role::DOCTOR
+        );
+
+        $this->assertCount(1, $targets);
+        $this->assertEquals($post->id, $targets->first()->id);
+    }
+
+    public function test_get_targets_by_type_and_roles_returns_filtered_collection(): void
+    {
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'More content',
+        ]);
+
+        $this->service->attach($this->user, $post, Role::DOCTOR);
+        $this->service->attach($this->user, $post2, Role::ADMIN);
+
+        // Récupérer les TestPost avec rôle DOCTOR ou ADMIN
+        $targets = $this->service->getTargetsByTypeAndRoles(
+            $this->user,
+            TestPost::class,
+            [Role::DOCTOR, Role::ADMIN]
+        );
+
+        $this->assertCount(2, $targets);
+    }
+
+    public function test_get_targets_by_types_and_roles_returns_filtered_collection(): void
+    {
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $this->service->attach($this->user, $post, Role::DOCTOR);
+        $this->service->attach($this->user, $user2, Role::ADMIN);
+
+        // Récupérer les TestPost et TestUser avec rôle DOCTOR
+        $targets = $this->service->getTargetsByTypesAndRoles(
+            $this->user,
+            [TestPost::class, TestUser::class],
+            [Role::DOCTOR]
+        );
+
+        $this->assertCount(1, $targets);
+        $this->assertEquals($post->id, $targets->first()->id);
+    }
+
+    // ============================================================
+    // GET TARGETS BY TYPE TESTS
+    // ============================================================
+
+    public function test_get_targets_by_type_returns_filtered_collection(): void
+    {
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'More content',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        // Attacher à différents types
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+        $this->service->attach($this->user, $post2, Role::ADMIN);
+        $this->service->attach($this->user, $user2, Role::STAFF);
+
+        // Récupérer uniquement les TestPost
+        $targets = $this->service->getTargetsByType($this->user, TestPost::class);
+
+        $this->assertCount(2, $targets);
+
+        // Vérifier que tous les targets sont des TestPost
+        foreach ($targets as $target) {
+            $this->assertInstanceOf(TestPost::class, $target);
+        }
+
+        // Vérifier la présence des IDs des posts
+        $targetIds = $targets->pluck('id')->toArray();
+        $this->assertContains($this->post->id, $targetIds);
+        $this->assertContains($post2->id, $targetIds);
+
+        // Vérifier qu'aucun TestUser n'est dans la collection
+        $this->assertFalse($targets->contains(fn ($target) => $target instanceof TestUser));
+    }
+
+    public function test_get_targets_by_type_returns_empty_collection_when_no_targets(): void
+    {
+        // Aucun rattachement créé
+        $targets = $this->service->getTargetsByType($this->user, TestPost::class);
+
+        $this->assertCount(0, $targets);
+        $this->assertInstanceOf(Collection::class, $targets);
+    }
+
+    public function test_get_targets_by_type_with_pagination_returns_paginated_results(): void
+    {
+        // Créer 5 posts
+        for ($i = 1; $i <= 5; $i++) {
+            $post = TestPost::create([
+                'user_id' => $this->user->id,
+                'title' => "Post {$i}",
+                'body' => "Content {$i}",
+            ]);
+            $this->service->attach($this->user, $post, Role::DOCTOR);
+        }
+
+        // Pagination : 2 par page, page 1
+        $paginator = $this->service->getTargetsByTypePaginated(
+            $this->user,
+            TestPost::class,
+            2,
+            1
+        );
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $paginator);
+        $this->assertEquals(2, $paginator->perPage());
+        $this->assertEquals(5, $paginator->total());
+        $this->assertEquals(1, $paginator->currentPage());
+        $this->assertEquals(3, $paginator->lastPage());
+
+        // Page 2
+        $paginator2 = $this->service->getTargetsByTypePaginated(
+            $this->user,
+            TestPost::class,
+            2,
+            2
+        );
+
+        $this->assertEquals(2, $paginator2->perPage());
+        $this->assertEquals(2, $paginator2->currentPage());
+    }
+
+    public function test_get_targets_by_type_with_different_types_returns_correct_collection(): void
+    {
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $this->service->attach($this->user, $post, Role::DOCTOR);
+        $this->service->attach($this->user, $user2, Role::ADMIN);
+
+        // Récupérer les TestPost
+        $posts = $this->service->getTargetsByType($this->user, TestPost::class);
+        $this->assertCount(1, $posts);
+        $this->assertEquals($post->id, $posts->first()->id);
+
+        // Récupérer les TestUser
+        $users = $this->service->getTargetsByType($this->user, TestUser::class);
+        $this->assertCount(1, $users);
+        $this->assertEquals($user2->id, $users->first()->id);
+    }
+
+    public function test_get_targets_by_type_with_constraints_respects_unique_constraints(): void
+    {
+        $constrainedUser = TestConstrainedUser::create([
+            'name' => 'Constrained User',
+            'email' => 'constrained@example.com',
+        ]);
+
+        $post1 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'First Post',
+            'body' => 'First content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'Second content',
+        ]);
+
+        // Attacher le premier post
+        $this->service->attach($constrainedUser, $post1, Role::DOCTOR);
+
+        // Récupérer les targets
+        $targets = $this->service->getTargetsByType($constrainedUser, TestPost::class);
+
+        $this->assertCount(1, $targets);
+        $this->assertEquals($post1->id, $targets->first()->id);
+
+        // Essayer d'attacher un deuxième post (devrait échouer à cause de la contrainte unique)
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('already has a unique attachment to');
+
+        $this->service->attach($constrainedUser, $post2, Role::ADMIN);
     }
 
     public function test_count_rattachables_returns_correct_count(): void
