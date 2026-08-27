@@ -10,6 +10,7 @@ use AndyDefer\LaravelRattachments\Enums\Role;
 use AndyDefer\LaravelRattachments\Models\Rattachment;
 use AndyDefer\LaravelRattachments\Repositories\RattachmentRepository;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCheckPoint;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
@@ -655,15 +656,16 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'email' => 'constrained@example.com',
         ]);
 
-        $user2 = TestUser::create([
-            'name' => 'Another User',
-            'email' => 'another@example.com',
+        $checkpoint = TestCheckPoint::create([
+            'name' => 'Test Checkpoint',
+            'location' => 'Test Location',
+            'is_active' => true,
         ]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('cannot be attached to');
 
-        $this->service->attach($constrainedUser, $user2, Role::DOCTOR);
+        $this->service->attach($constrainedUser, $checkpoint, Role::DOCTOR);
     }
 
     public function test_attach_with_constraints_throws_exception_for_disallowed_role(): void
@@ -747,5 +749,180 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->expectExceptionMessage('Role "pharmacist" is not allowed');
 
         $this->service->syncAttachments($constrainedUser, $targets);
+    }
+
+    // ============================================================
+    // UNIQUE CONSTRAINTS TESTS
+    // ============================================================
+
+    public function test_attach_with_unique_constraint_allows_single_attachment(): void
+    {
+        $constrainedUser = TestConstrainedUser::create([
+            'name' => 'Constrained User',
+            'email' => 'constrained@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'First Post',
+            'body' => 'First content',
+        ]);
+
+        // ✅ Premier rattachement autorisé
+        $attachment = $this->service->attach(
+            $constrainedUser,
+            $post,
+            Role::DOCTOR
+        );
+
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+        $this->assertEquals(Role::DOCTOR, $attachment->role);
+    }
+
+    public function test_attach_with_unique_constraint_throws_exception_for_second_attachment_to_same_type(): void
+    {
+        $constrainedUser = TestConstrainedUser::create([
+            'name' => 'Constrained User',
+            'email' => 'constrained@example.com',
+        ]);
+
+        $post1 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'First Post',
+            'body' => 'First content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'Second content',
+        ]);
+
+        // ✅ Premier rattachement autorisé
+        $this->service->attach($constrainedUser, $post1, Role::DOCTOR);
+
+        // ❌ Deuxième rattachement vers le même type de target → Exception
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('already has a unique attachment to');
+
+        $this->service->attach($constrainedUser, $post2, Role::ADMIN);
+    }
+
+    public function test_attach_with_unique_constraint_allows_different_target_types(): void
+    {
+        $constrainedUser = TestConstrainedUser::create([
+            'name' => 'Constrained User',
+            'email' => 'constrained@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'Another User',
+            'email' => 'another@example.com',
+        ]);
+
+        // ✅ Rattachement vers TestPost autorisé
+        $this->service->attach($constrainedUser, $post, Role::DOCTOR);
+
+        // ✅ Rattachement vers TestUser (target différent) autorisé
+        $attachment = $this->service->attach($constrainedUser, $user2, Role::ADMIN);
+
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+        $this->assertEquals(Role::ADMIN, $attachment->role);
+    }
+
+    public function test_sync_attachments_with_unique_constraint_prevents_duplicate_types(): void
+    {
+        $constrainedUser = TestConstrainedUser::create([
+            'name' => 'Constrained User',
+            'email' => 'constrained@example.com',
+        ]);
+
+        $post1 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'First Post',
+            'body' => 'First content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'Second content',
+        ]);
+
+        // Premier rattachement autorisé
+        $this->service->attach($constrainedUser, $post1, Role::DOCTOR);
+
+        // ❌ Sync avec deux TestPost → Exception
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('already has a unique attachment to');
+
+        $this->service->syncAttachments($constrainedUser, [
+            [
+                'target' => $post1,
+                'role' => Role::DOCTOR,
+            ],
+            [
+                'target' => $post2,
+                'role' => Role::ADMIN,
+            ],
+        ]);
+    }
+
+    public function test_update_role_does_not_trigger_unique_constraint(): void
+    {
+        $constrainedUser = TestConstrainedUser::create([
+            'name' => 'Constrained User',
+            'email' => 'constrained@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $this->service->attach($constrainedUser, $post, Role::DOCTOR);
+
+        // ✅ Mise à jour du rôle autorisée (ne crée pas de nouveau rattachement)
+        $this->service->updateRole($constrainedUser, $post, Role::ADMIN);
+
+        $attachment = $this->service->getAttachment($constrainedUser, $post);
+        $this->assertEquals(Role::ADMIN, $attachment->role);
+    }
+
+    public function test_unique_constraint_does_not_affect_models_without_interface(): void
+    {
+        // TestUser n'implémente pas RattachmentConstraintsInterface
+        $user = TestUser::create([
+            'name' => 'Normal User',
+            'email' => 'normal@example.com',
+        ]);
+
+        $post1 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'First Post',
+            'body' => 'First content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'Second content',
+        ]);
+
+        // ✅ Rattachement autorisé
+        $this->service->attach($user, $post1, Role::DOCTOR);
+
+        // ✅ Deuxième rattachement autorisé (pas de contrainte unique)
+        $attachment = $this->service->attach($user, $post2, Role::ADMIN);
+
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+        $this->assertEquals(Role::ADMIN, $attachment->role);
     }
 }

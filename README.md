@@ -2,7 +2,7 @@
 
 > Système de rattachement polymorphique double pour applications Laravel
 
-Un package Laravel complet pour gérer des relations polymorphiques doubles entre n'importe quels modèles Eloquent, avec des rôles configurables, des métadonnées et un système de contraintes.
+Un package Laravel complet pour gérer des relations polymorphiques doubles entre n'importe quels modèles Eloquent, avec des rôles configurables, des métadonnées, un système de contraintes et des contraintes uniques.
 
 ---
 
@@ -23,6 +23,8 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
   - [Filtrer et compter](#filtrer-et-compter)
 - [Rôles par défaut](#rôles-par-défaut)
 - [Système de contraintes](#système-de-contraintes)
+  - [Contraintes de cibles autorisées](#contraintes-de-cibles-autorisées)
+  - [Contraintes uniques](#contraintes-uniques)
 - [Référence de l'API](#référence-de-lapi)
 - [Value Objects](#value-objects)
 - [Structure de la base de données](#structure-de-la-base-de-données)
@@ -37,6 +39,7 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - ✅ **Double polymorphisme** - Rattachez n'importe quel modèle à n'importe quel autre modèle
 - ✅ **Rôles configurables** - Définissez vos propres rôles via des énumérations
 - ✅ **Système de contraintes** - Limitez les rattachements possibles par modèle et rôle
+- ✅ **Contraintes uniques** - Limitez un modèle à un seul rattachement par type de cible
 - ✅ **Métadonnées flexibles** - Stockez des données supplémentaires au format JSON
 - ✅ **Pattern Repository** - Séparation propre de la logique d'accès aux données
 - ✅ **Support des DTOs** - Objets de transfert de données typés
@@ -45,6 +48,7 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - ✅ **Opérations en masse** - Rattachement et détachement multiples
 - ✅ **Synchronisation** - Synchronisez tous les rattachements d'un modèle en une seule opération
 - ✅ **Pagination** - Récupérez les résultats paginés
+- ✅ **Rôle optionnel** - Les rattachements peuvent être créés sans rôle
 - ✅ **Tests complets** - Couverture complète des tests d'intégration
 
 ---
@@ -191,57 +195,14 @@ use App\Enums\CustomRole;
 // Rattacher avec votre rôle
 $attachment = $service->attach($user, $hospital, CustomRole::DOCTOR);
 
+// Rattacher sans rôle
+$attachment = $service->attach($user, $post, null, ['type' => 'author']);
+
 // Récupérer par rôle
 $doctors = $service->getRattachablesByRole($hospital, CustomRole::DOCTOR);
 
 // Mettre à jour le rôle
 $service->updateRole($user, $hospital, CustomRole::ADMIN);
-```
-
----
-
-### Système de contraintes
-
-Le package permet de définir des contraintes pour limiter les rattachements possibles.
-
-#### 1. Implémenter l'interface
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Models;
-
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
-use Illuminate\Database\Eloquent\Model;
-
-final class User extends Model implements RattachmentConstraintsInterface
-{
-    public function allowedTargets(): array
-    {
-        return [
-            Hospital::class => [Role::DOCTOR, Role::STAFF, Role::ADMIN],
-            Pharmacy::class => [Role::PHARMACIST, Role::STAFF],
-        ];
-    }
-}
-```
-
-#### 2. Résultat
-
-```php
-// ✅ OK - User peut être rattaché à Hospital avec rôle DOCTOR
-$service->attach($user, $hospital, Role::DOCTOR);
-
-// ❌ ERREUR - User ne peut pas être rattaché à Pharmacy avec rôle DOCTOR
-$service->attach($user, $pharmacy, Role::DOCTOR);
-// RuntimeException: Role "Médecin" is not allowed for User -> Pharmacy. Allowed roles: Pharmacien, Personnel
-
-// ❌ ERREUR - User ne peut pas être rattaché à Specialty (non autorisé)
-$service->attach($user, $specialty, Role::HAS_SPECIALTY);
-// RuntimeException: User cannot be attached to Specialty. Allowed targets: Hospital, Pharmacy
 ```
 
 ---
@@ -260,7 +221,7 @@ class DoctorController extends Controller
     {
         $doctor = auth()->user();
 
-        // Rattachement simple
+        // Rattachement avec rôle
         $attachment = $service->attach(
             $doctor,                // Modèle à rattacher
             $hospital,              // Modèle cible
@@ -269,6 +230,14 @@ class DoctorController extends Controller
                 'consultation_days' => ['monday', 'wednesday', 'friday'],
                 'consultation_hours' => '09:00-17:00',
             ]
+        );
+
+        // Rattachement sans rôle
+        $attachment = $service->attach(
+            $doctor,
+            $hospital,
+            null,                   // Pas de rôle
+            ['type' => 'visitor']
         );
 
         return response()->json([
@@ -413,15 +382,116 @@ Le package fournit un enum par défaut, mais vous êtes libre de le remplacer pa
 
 ---
 
+## 🔒 Système de contraintes
+
+Le package offre deux types de contraintes pour sécuriser les rattachements.
+
+### Contraintes de cibles autorisées
+
+Permet de définir quels types de modèles peuvent être rattachés et avec quels rôles.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Enums\Role;
+use Illuminate\Database\Eloquent\Model;
+
+final class User extends Model implements RattachmentConstraintsInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            Hospital::class => [Role::DOCTOR, Role::STAFF, Role::ADMIN],
+            Pharmacy::class => [Role::PHARMACIST, Role::STAFF],
+        ];
+    }
+}
+```
+
+**Résultat :**
+```php
+// ✅ OK - User peut être rattaché à Hospital avec rôle DOCTOR
+$service->attach($user, $hospital, Role::DOCTOR);
+
+// ❌ ERREUR - User ne peut pas être rattaché à Pharmacy avec rôle DOCTOR
+$service->attach($user, $pharmacy, Role::DOCTOR);
+// RuntimeException: Role "Médecin" is not allowed for User -> Pharmacy. Allowed roles: Pharmacien, Personnel
+
+// ❌ ERREUR - User ne peut pas être rattaché à Specialty (non autorisé)
+$service->attach($user, $specialty, Role::HAS_SPECIALTY);
+// RuntimeException: User cannot be attached to Specialty. Allowed targets: Hospital, Pharmacy
+```
+
+### Contraintes uniques
+
+Permet de limiter un modèle à un seul rattachement par type de cible. Utile pour des relations "one-to-one".
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Enums\Role;
+use Illuminate\Database\Eloquent\Model;
+
+final class Hospital extends Model implements RattachmentConstraintsInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            User::class => [Role::ADMIN, Role::STAFF],
+            Pharmacy::class => [Role::SUPPLIER],
+        ];
+    }
+
+    public function uniqueTargets(): array
+    {
+        return [
+            User::class,     // Un hôpital ne peut avoir qu'un seul directeur (User avec rôle ADMIN)
+            Pharmacy::class, // Un hôpital ne peut avoir qu'une seule pharmacie principale
+        ];
+    }
+}
+```
+
+**Résultat :**
+```php
+// ✅ OK - Premier rattachement vers User autorisé
+$service->attach($hospital, $user1, Role::ADMIN);
+
+// ❌ ERREUR - Deuxième rattachement vers User refusé (contrainte unique)
+$service->attach($hospital, $user2, Role::ADMIN);
+// RuntimeException: Hospital already has a unique attachment to User. Only one User is allowed.
+
+// ✅ OK - Rattachement vers Pharmacy autorisé (type de target différent)
+$service->attach($hospital, $pharmacy, Role::SUPPLIER);
+```
+
+**La contrainte est unidirectionnelle :**
+- Un `Hospital` ne peut avoir qu'un seul `User` (si défini dans Hospital)
+- Un `User` peut avoir plusieurs `Hospital` (pas de contrainte du côté User)
+
+Pour une contrainte bidirectionnelle, les deux modèles doivent implémenter `uniqueTargets()`.
+
+---
+
 ## 📚 Référence de l'API
 
 ### RattachmentService
 
 | Méthode | Description | Retourne |
 |---------|-------------|----------|
-| `attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = [])` | Crée un rattachement | `Model` |
-| `attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = [])` | Rattache plusieurs modèles à une cible | `Collection` |
-| `attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = [])` | Rattache un modèle à plusieurs cibles | `Collection` |
+| `attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = [])` | Crée un rattachement | `Model` |
+| `attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = [])` | Rattache plusieurs modèles à une cible | `Collection` |
+| `attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = [])` | Rattache un modèle à plusieurs cibles | `Collection` |
 | `detach(Model $rattachable, Model $target)` | Supprime un rattachement | `void` |
 | `detachMultiple(Collection $rattachables, Model $target)` | Supprime plusieurs rattachements | `void` |
 | `detachFromMultiple(Model $rattachable, Collection $targets)` | Supprime les rattachements d'un modèle vers plusieurs cibles | `void` |
@@ -447,7 +517,7 @@ Le package fournit un enum par défaut, mais vous êtes libre de le remplacer pa
 | `updateMetadata(Model $rattachable, Model $target, array $metadata)` | Met à jour les métadonnées | `void` |
 | `mergeMetadata(Model $rattachable, Model $target, array $metadata)` | Fusionne les métadonnées | `void` |
 | `getAttachment(Model $rattachable, Model $target)` | Récupère un rattachement spécifique | `?Model` |
-| `hasAttachmentsBetween(Model $rattachable, Model $target)` | Vérifie l'existence d'un rattachement | `bool` |
+| `hasAttachmentsBetween(Model $rattachable, Model $target)` | Vérifie l'existence d'un rattachement entre deux modèles | `bool` |
 | `hasAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Vérifie l'existence de rattachements entre types | `bool` |
 | `getAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Récupère les rattachements entre types | `Collection` |
 | `deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Supprime tous les rattachements entre types | `int` |
@@ -490,7 +560,7 @@ CREATE TABLE rattachments (
     rattachable_id BIGINT UNSIGNED NOT NULL,-- ID du modèle rattaché
     target_type VARCHAR(255) NOT NULL,      -- Type du modèle cible
     target_id BIGINT UNSIGNED NOT NULL,     -- ID du modèle cible
-    role VARCHAR(50) NOT NULL,              -- Rôle (valeur de votre enum)
+    role VARCHAR(50) NULL,                  -- Rôle (valeur de votre enum, nullable)
     metadata JSON NULL,                     -- Métadonnées
     created_at TIMESTAMP NULL,
     updated_at TIMESTAMP NULL,
@@ -501,6 +571,8 @@ CREATE TABLE rattachments (
     INDEX idx_role (role)
 );
 ```
+
+> **Note :** La colonne `role` est maintenant nullable pour permettre des rattachements sans rôle.
 
 ---
 
@@ -527,7 +599,6 @@ class HospitalController extends Controller
     {
         $doctor = User::find($request->input('doctor_id'));
 
-        // Rattacher le médecin
         $attachment = $this->service->attach(
             $doctor,
             $hospital,
@@ -547,7 +618,6 @@ class HospitalController extends Controller
 
     public function getDoctors(Hospital $hospital)
     {
-        // Récupérer tous les médecins avec pagination
         $doctors = $this->service->getRattachablesByRolePaginated(
             $hospital,
             Role::DOCTOR,
@@ -562,7 +632,6 @@ class HospitalController extends Controller
     {
         $doctor = User::find($request->input('doctor_id'));
 
-        // Synchroniser les rattachements du médecin
         $attachments = $this->service->syncAttachments($doctor, [
             [
                 'target' => $hospital,

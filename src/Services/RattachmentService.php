@@ -74,10 +74,60 @@ final class RattachmentService implements RattachmentServiceInterface
         }
     }
 
+    /**
+     * Validate unique constraints.
+     * A model can only have ONE attachment per unique target type.
+     *
+     * @param  Model  $rattachable  The model being attached
+     * @param  Model  $target  The target model
+     *
+     * @throws RuntimeException If unique constraint is violated
+     */
+    private function validateUniqueConstraints(Model $rattachable, Model $target): void
+    {
+        if (! $rattachable instanceof RattachmentConstraintsInterface) {
+            return;
+        }
+
+        $uniqueTargets = $rattachable->uniqueTargets();
+        $targetClass = $target->getMorphClass();
+
+        // Vérifier si ce type de target est en unique
+        if (! in_array($targetClass, $uniqueTargets, true)) {
+            return;
+        }
+
+        // Vérifier si le rattachable a déjà un attachment vers ce type de target
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $targetClass,
+        ]);
+
+        $findByRecord = new FindByRecord(
+            filters: $filter,
+            limit: 1,
+        );
+
+        $existing = $this->repository->findBy($findByRecord);
+
+        if ($existing->isNotEmpty()) {
+            throw new RuntimeException(sprintf(
+                '%s already has a unique attachment to %s. Only one %s is allowed.',
+                $rattachable->getMorphClass(),
+                $targetClass,
+                class_basename($targetClass)
+            ));
+        }
+    }
+
     public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model
     {
         // ✅ Valider les contraintes avant l'attachement
         $this->validateConstraints($rattachable, $target, $role);
+
+        // ✅ Valider les contraintes uniques
+        $this->validateUniqueConstraints($rattachable, $target);
 
         if ($this->isAttached($rattachable, $target)) {
             throw new RuntimeException(sprintf(
@@ -541,12 +591,14 @@ final class RattachmentService implements RattachmentServiceInterface
             // ✅ Valider les contraintes avant la synchronisation
             $this->validateConstraints($rattachable, $target, $role);
 
+            // ✅ Valider les contraintes uniques
+            $this->validateUniqueConstraints($rattachable, $target);
+
             $newTargetIds[] = $target->getKey();
 
             $existing = $this->findExisting($rattachable, $target);
 
             if ($existing) {
-                // Si un rôle est fourni, le mettre à jour
                 if ($role !== null) {
                     $this->updateRole($rattachable, $target, $role);
                 }

@@ -21,6 +21,14 @@ final class TestConstrainedUser extends Model implements RattachmentConstraintsI
     {
         return [
             TestPost::class => [Role::DOCTOR, Role::ADMIN],
+            TestUser::class => [Role::DOCTOR, Role::ADMIN],
+        ];
+    }
+
+    public function uniqueTargets(): array
+    {
+        return [
+            TestPost::class,
         ];
     }
 }

@@ -24,4 +24,18 @@ interface RattachmentConstraintsInterface
      * ];
      */
     public function allowedTargets(): array;
+
+    /**
+     * Define unique targets for this model.
+     * A model can only have ONE attachment to each target type listed here.
+     *
+     * @return array<int, string> Array of FQCNs
+     *
+     * @example
+     * return [
+     *     User::class,  // A Hospital can have only ONE User (director)
+     *     Pharmacy::class, // A Hospital can have only ONE Pharmacy (main supplier)
+     * ];
+     */
+    public function uniqueTargets(): array;
 }
