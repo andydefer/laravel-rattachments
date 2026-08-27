@@ -1,8 +1,8 @@
-# Laravel Ratings
+# Laravel Rattachments
 
-> Système d'évaluation et d'avis polymorphique pour applications Laravel
+> Système de rattachement polymorphique double pour applications Laravel
 
-Un package Laravel complet pour gérer des évaluations par étoiles (1 à 5) avec avis textuels, calculs de moyenne, distribution des notes et support polymorphique.
+Un package Laravel complet pour gérer des relations polymorphiques doubles entre n'importe quels modèles Eloquent, avec des rôles configurables, des métadonnées et un système de contraintes.
 
 ---
 
@@ -12,15 +12,17 @@ Un package Laravel complet pour gérer des évaluations par étoiles (1 à 5) av
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Extensibilité](#extensibilité)
 - [Utilisation](#utilisation)
-  - [Créer une évaluation](#créer-une-évaluation)
-  - [Modifier une évaluation](#modifier-une-évaluation)
-  - [Supprimer une évaluation](#supprimer-une-évaluation)
-  - [Vérifier une évaluation](#vérifier-une-évaluation)
-  - [Récupérer les évaluations](#récupérer-les-évaluations)
-  - [Statistiques et moyennes](#statistiques-et-moyennes)
-  - [Filtrer par niveau](#filtrer-par-niveau)
-- [Niveaux d'évaluation](#niveaux-dévaluation)
+  - [Créer un rattachement](#créer-un-rattachement)
+  - [Supprimer un rattachement](#supprimer-un-rattachement)
+  - [Vérifier un rattachement](#vérifier-un-rattachement)
+  - [Récupérer les rattachements](#récupérer-les-rattachements)
+  - [Mettre à jour un rattachement](#mettre-à-jour-un-rattachement)
+  - [Synchroniser les rattachements](#synchroniser-les-rattachements)
+  - [Filtrer et compter](#filtrer-et-compter)
+- [Rôles par défaut](#rôles-par-défaut)
+- [Système de contraintes](#système-de-contraintes)
 - [Référence de l'API](#référence-de-lapi)
 - [Value Objects](#value-objects)
 - [Structure de la base de données](#structure-de-la-base-de-données)
@@ -32,18 +34,18 @@ Un package Laravel complet pour gérer des évaluations par étoiles (1 à 5) av
 
 ## ✨ Fonctionnalités
 
-- ✅ **Double polymorphisme** - Évaluez n'importe quel modèle avec n'importe quel utilisateur
-- ✅ **5 niveaux d'évaluation** - ⭐ à ⭐⭐⭐⭐⭐ avec labels personnalisés
-- ✅ **Avis textuels** - Commentaires optionnels associés aux notes
-- ✅ **Calcul de moyenne** - Note moyenne automatique avec arrondi à 2 décimales
-- ✅ **Distribution des notes** - Répartition des évaluations par niveau
-- ✅ **Anti-doublon** - Un utilisateur ne peut pas évaluer deux fois le même objet
+- ✅ **Double polymorphisme** - Rattachez n'importe quel modèle à n'importe quel autre modèle
+- ✅ **Rôles configurables** - Définissez vos propres rôles via des énumérations
+- ✅ **Système de contraintes** - Limitez les rattachements possibles par modèle et rôle
+- ✅ **Métadonnées flexibles** - Stockez des données supplémentaires au format JSON
 - ✅ **Pattern Repository** - Séparation propre de la logique d'accès aux données
 - ✅ **Support des DTOs** - Objets de transfert de données typés
-- ✅ **Value Objects** - DateTime, Métadonnées
-- ✅ **Support des métadonnées** - Stockez des données supplémentaires au format JSON
-- ✅ **Suppression douce** - Suppression sécurisée avec possibilité de restauration
-- ✅ **Filtrage avancé** - Filtrez par note minimale, maximale, par auteur, par objet
+- ✅ **Value Objects** - Métadonnées typées avec `StrictDataObject`
+- ✅ **Enum Casts** - Conversion automatique entre base de données et énumérations PHP
+- ✅ **Opérations en masse** - Rattachement et détachement multiples
+- ✅ **Synchronisation** - Synchronisez tous les rattachements d'un modèle en une seule opération
+- ✅ **Pagination** - Récupérez les résultats paginés
+- ✅ **Tests complets** - Couverture complète des tests d'intégration
 
 ---
 
@@ -59,13 +61,13 @@ Un package Laravel complet pour gérer des évaluations par étoiles (1 à 5) av
 Installez le package via Composer :
 
 ```bash
-composer require andydefer/laravel-ratings
+composer require andydefer/laravel-rattachments
 ```
 
 ### Publier les migrations
 
 ```bash
-php artisan vendor:publish --tag=ratings-migrations
+php artisan vendor:publish --tag=rattachments-migrations
 ```
 
 ### Exécuter les migrations
@@ -78,219 +80,378 @@ php artisan migrate
 
 ## ⚙️ Configuration
 
+### Service Provider
+
 Le package est automatiquement découvert par Laravel. Aucune configuration supplémentaire n'est requise.
 
-Si vous devez personnaliser le Service Provider, ajoutez-le manuellement dans `config/app.php` :
+### Configuration des Enum Casts
+
+Le package utilise le système d'`EnumCast` du package `andydefer/laravel-repository` pour convertir automatiquement les valeurs en énumérations PHP.
+
+Créez ou modifiez le fichier `config/repository.php` :
 
 ```php
-'providers' => [
-    // ...
-    AndyDefer\LaravelRattachments\RatingsServiceProvider::class,
+<?php
+
+return [
+    /*
+    |--------------------------------------------------------------------------
+    | Enum Casts
+    |--------------------------------------------------------------------------
+    |
+    | Define enum casts for specific tables and columns.
+    | Each entry maps a table name and column to an enum class.
+    |
+    | The enum class must implement EnumerableInterface.
+    |
+    */
+    'enum_casts' => [
+        'rattachments' => [
+            'role' => App\Enums\CustomRole::class, // Votre enum personnalisé
+        ],
+    ],
+];
+```
+
+> **⚠️ Important** : 
+> - Sans cette configuration, les énumérations ne seront pas automatiquement converties
+> - L'énumération **DOIT** implémenter l'interface `AndyDefer\Repository\Contracts\EnumerableInterface`
+> - La méthode `getValue()` est obligatoire pour l'interface
+
+---
+
+## 🔧 Extensibilité
+
+### Créer vos rôles personnalisés
+
+Le package est conçu pour être extensible. Vous devez créer votre propre enum qui implémente `EnumerableInterface`.
+
+> **⚠️ OBLIGATOIRE :** Vos énumérations DOIVENT implémenter l'interface `EnumerableInterface`
+
+#### 1. Créer votre enum
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enums;
+
+use AndyDefer\Repository\Contracts\EnumerableInterface;
+
+enum CustomRole: string implements EnumerableInterface  // ⚠️ Interface obligatoire
+{
+    case DOCTOR = 'doctor';
+    case PHARMACIST = 'pharmacist';
+    case STAFF = 'staff';
+    case ADMIN = 'admin';
+    case SUPPLIER = 'supplier';
+    // Ajoutez autant de cas que vous voulez !
+
+    /**
+     * Obligatoire - Retourne la valeur brute de l'énumération
+     */
+    public function getValue(): string
+    {
+        return $this->value;
+    }
+
+    /**
+     * Optionnel - Méthode utilitaire pour l'affichage
+     */
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::DOCTOR => 'Médecin',
+            self::PHARMACIST => 'Pharmacien',
+            self::STAFF => 'Personnel',
+            self::ADMIN => 'Administrateur',
+            self::SUPPLIER => 'Fournisseur',
+        };
+    }
+}
+```
+
+#### 2. Configurer l'enum dans le repository
+
+```php
+// config/repository.php
+'enum_casts' => [
+    'rattachments' => [
+        'role' => App\Enums\CustomRole::class,
+    ],
 ],
+```
+
+#### 3. Utiliser vos rôles
+
+```php
+use App\Enums\CustomRole;
+
+// Rattacher avec votre rôle
+$attachment = $service->attach($user, $hospital, CustomRole::DOCTOR);
+
+// Récupérer par rôle
+$doctors = $service->getRattachablesByRole($hospital, CustomRole::DOCTOR);
+
+// Mettre à jour le rôle
+$service->updateRole($user, $hospital, CustomRole::ADMIN);
+```
+
+---
+
+### Système de contraintes
+
+Le package permet de définir des contraintes pour limiter les rattachements possibles.
+
+#### 1. Implémenter l'interface
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Enums\Role;
+use Illuminate\Database\Eloquent\Model;
+
+final class User extends Model implements RattachmentConstraintsInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            Hospital::class => [Role::DOCTOR, Role::STAFF, Role::ADMIN],
+            Pharmacy::class => [Role::PHARMACIST, Role::STAFF],
+        ];
+    }
+}
+```
+
+#### 2. Résultat
+
+```php
+// ✅ OK - User peut être rattaché à Hospital avec rôle DOCTOR
+$service->attach($user, $hospital, Role::DOCTOR);
+
+// ❌ ERREUR - User ne peut pas être rattaché à Pharmacy avec rôle DOCTOR
+$service->attach($user, $pharmacy, Role::DOCTOR);
+// RuntimeException: Role "Médecin" is not allowed for User -> Pharmacy. Allowed roles: Pharmacien, Personnel
+
+// ❌ ERREUR - User ne peut pas être rattaché à Specialty (non autorisé)
+$service->attach($user, $specialty, Role::HAS_SPECIALTY);
+// RuntimeException: User cannot be attached to Specialty. Allowed targets: Hospital, Pharmacy
 ```
 
 ---
 
 ## 📖 Utilisation
 
-### Créer une évaluation
+### Créer un rattachement
 
 ```php
-use AndyDefer\LaravelRattachments\Services\RatingService;
-use AndyDefer\LaravelRattachments\Enums\RatingLevel;
+use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Enums\Role;
 
-class ProductController extends Controller
+class DoctorController extends Controller
 {
-    public function rate(RatingService $ratingService, Product $product)
+    public function attachToHospital(RattachmentService $service, Hospital $hospital)
     {
-        $user = auth()->user();
+        $doctor = auth()->user();
 
-        // Évaluer avec 5 étoiles et un avis
-        $rating = $ratingService->rate(
-            rater: $user,
-            rateable: $product,
-            rating: RatingLevel::FIVE,
-            review: 'Excellent produit, je recommande vivement !'
+        // Rattachement simple
+        $attachment = $service->attach(
+            $doctor,                // Modèle à rattacher
+            $hospital,              // Modèle cible
+            Role::DOCTOR,           // Rôle du rattachement
+            [                       // Métadonnées (optionnel)
+                'consultation_days' => ['monday', 'wednesday', 'friday'],
+                'consultation_hours' => '09:00-17:00',
+            ]
         );
 
         return response()->json([
-            'message' => 'Évaluation ajoutée avec succès',
-            'rating' => $rating
+            'message' => 'Docteur rattaché à l\'hôpital',
+            'attachment' => $attachment,
         ]);
     }
 }
 ```
 
-### Modifier une évaluation
+### Rattachement multiple
 
 ```php
-public function updateRating(RatingService $ratingService, Product $product)
-{
-    $user = auth()->user();
+// Rattacher plusieurs modèles à une même cible
+$attachments = $service->attachMultiple(
+    collect([$doctor1, $doctor2, $doctor3]),
+    $hospital,
+    Role::DOCTOR,
+    ['department' => 'Cardiology']
+);
 
-    try {
-        $updated = $ratingService->updateRating(
-            rater: $user,
-            rateable: $product,
-            rating: RatingLevel::FOUR,
-            review: 'Très bon produit, mais quelques petites améliorations possibles'
-        );
-
-        return response()->json([
-            'message' => 'Évaluation mise à jour',
-            'rating' => $updated
-        ]);
-    } catch (RuntimeException $e) {
-        return response()->json(['error' => $e->getMessage()], 404);
-    }
-}
-```
-
-### Supprimer une évaluation
-
-```php
-public function deleteRating(RatingService $ratingService, Product $product)
-{
-    $user = auth()->user();
-
-    try {
-        $ratingService->deleteRating($user, $product);
-
-        return response()->json([
-            'message' => 'Évaluation supprimée avec succès'
-        ]);
-    } catch (RuntimeException $e) {
-        return response()->json(['error' => $e->getMessage()], 404);
-    }
-}
-```
-
-### Vérifier une évaluation
-
-```php
-// Vérifier si l'utilisateur a déjà évalué
-$hasRated = $ratingService->hasRated($user, $product);
-
-// Récupérer l'évaluation spécifique
-$rating = $ratingService->getRaterRating($user, $product);
-```
-
-### Récupérer les évaluations
-
-```php
-// Récupérer toutes les évaluations d'un produit
-$ratings = $ratingService->getRatings($product);
-
-// Récupérer toutes les évaluations d'un utilisateur
-$userRatings = $ratingService->getRatingsByRater($user);
-
-// Récupérer uniquement les bonnes notes (4⭐ et 5⭐)
-$topRatings = $ratingService->getRatings(
-    rateable: $product,
-    minRating: RatingLevel::FOUR
+// Rattacher un modèle à plusieurs cibles
+$attachments = $service->attachToMultiple(
+    $doctor,
+    collect([$hospital1, $hospital2, $hospital3]),
+    Role::DOCTOR
 );
 ```
 
-### Statistiques et moyennes
+### Supprimer un rattachement
 
 ```php
-// Calculer la note moyenne
-$average = $ratingService->getAverageRating($product); // 4.2
+// Supprimer un rattachement spécifique
+$service->detach($doctor, $hospital);
 
-// Compter le nombre total d'évaluations
-$total = $ratingService->countRatings($product); // 127
-
-// Compter les évaluations par niveau
-$fiveStars = $ratingService->countRatingsByLevel($product, RatingLevel::FIVE);
-
-// Obtenir la distribution complète
-$distribution = $ratingService->getRatingDistribution($product);
-// [
-//     1 => 2,
-//     2 => 5,
-//     3 => 10,
-//     4 => 32,
-//     5 => 78
-// ]
+// Supprimer tous les rattachements d'un modèle
+$service->detachAll($doctor);
 ```
 
-### Filtrer par niveau
+### Vérifier un rattachement
 
 ```php
-// Récupérer les évaluations entre 3⭐ et 5⭐
-$filtered = $ratingService->getRatings(
-    rateable: $product,
-    minRating: RatingLevel::THREE,
-    maxRating: RatingLevel::FIVE
-);
+// Vérifier si un modèle est rattaché à un autre
+$isAttached = $service->isAttached($doctor, $hospital);
 
-// Récupérer uniquement les notes supérieures à 3⭐
-$goodRatings = $ratingService->getRatings(
-    rateable: $product,
-    minRating: RatingLevel::FOUR
-);
+// Vérifier si un rôle existe pour une cible
+$hasDoctors = $service->hasRoleAttached($hospital, Role::DOCTOR);
 
-// Récupérer uniquement les notes inférieures à 3⭐
-$badRatings = $ratingService->getRatings(
-    rateable: $product,
-    maxRating: RatingLevel::THREE
-);
+// Vérifier si un rattachement existe entre deux modèles spécifiques
+$exists = $service->hasAttachmentsBetween($doctor, $hospital);
+```
+
+### Récupérer les rattachements
+
+```php
+// Récupérer tous les modèles rattachés à une cible
+$doctors = $service->getRattachables($hospital);
+
+// Récupérer les modèles rattachés avec un rôle spécifique
+$doctors = $service->getRattachablesByRole($hospital, Role::DOCTOR);
+
+// Récupérer toutes les cibles d'un modèle
+$hospitals = $service->getTargets($doctor);
+
+// Récupérer les cibles avec un rôle spécifique
+$hospitals = $service->getTargetsByRole($doctor, Role::DOCTOR);
+```
+
+### Mettre à jour un rattachement
+
+```php
+// Mettre à jour le rôle
+$service->updateRole($doctor, $hospital, Role::ADMIN);
+
+// Mettre à jour les métadonnées
+$service->updateMetadata($doctor, $hospital, [
+    'consultation_hours' => '10:00-18:00',
+]);
+
+// Fusionner les métadonnées (conserve les existantes)
+$service->mergeMetadata($doctor, $hospital, [
+    'availability' => 'Monday-Friday',
+]);
+```
+
+### Synchroniser les rattachements
+
+```php
+// Synchronise tous les rattachements d'un médecin
+$attachments = $service->syncAttachments($doctor, [
+    [
+        'target' => $hospital1,
+        'role' => Role::DOCTOR,
+        'metadata' => ['primary' => true],
+    ],
+    [
+        'target' => $hospital2,
+        'role' => Role::DOCTOR,
+    ],
+    [
+        'target' => $pharmacy,
+        'role' => Role::PHARMACIST,
+    ],
+]);
+
+// Les rattachements précédents (ex: hospital3) seront automatiquement supprimés
+```
+
+### Filtrer et compter
+
+```php
+// Compter les rattachements
+$total = $service->countRattachables($hospital);
+$doctorsCount = $service->countRattachablesByRole($hospital, Role::DOCTOR);
+
+// Récupérer les rôles distincts
+$roles = $service->getDistinctRolesForTarget($hospital);
+
+// Pagination
+$paginator = $service->getRattachablesPaginated($hospital, 15, 1);
+$paginator = $service->getTargetsPaginated($doctor, 15, 1);
 ```
 
 ---
 
-## 🏷️ Niveaux d'évaluation
+## 🏷️ Rôles par défaut
 
-| Niveau | Valeur | Étoiles | Label |
-|--------|--------|---------|-------|
-| `RatingLevel::ONE` | `1` | ⭐ | Très mauvais |
-| `RatingLevel::TWO` | `2` | ⭐⭐ | Mauvais |
-| `RatingLevel::THREE` | `3` | ⭐⭐⭐ | Moyen |
-| `RatingLevel::FOUR` | `4` | ⭐⭐⭐⭐ | Bien |
-| `RatingLevel::FIVE` | `5` | ⭐⭐⭐⭐⭐ | Excellent |
+Le package fournit un enum par défaut, mais vous êtes libre de le remplacer par le vôtre.
 
-### Utilisation des étoiles et labels
+| Type | Valeur | Label |
+|------|--------|-------|
+| `Role::DOCTOR` | `'doctor'` | Médecin |
+| `Role::PHARMACIST` | `'pharmacist'` | Pharmacien |
+| `Role::STAFF` | `'staff'` | Personnel |
+| `Role::ADMIN` | `'admin'` | Administrateur |
+| `Role::MANAGER` | `'manager'` | Gestionnaire |
+| `Role::NURSE` | `'nurse'` | Infirmier |
+| `Role::SPECIALIST` | `'specialist'` | Spécialiste |
+| `Role::VOLUNTEER` | `'volunteer'` | Bénévole |
 
-```php
-use AndyDefer\LaravelRattachments\Enums\RatingLevel;
-
-$level = RatingLevel::FIVE;
-echo $level->getStars();       // ⭐⭐⭐⭐⭐
-echo $level->getLabel();       // Excellent
-echo $level->getPercentage();  // 100%
-
-$level = RatingLevel::THREE;
-echo $level->getStars();       // ⭐⭐⭐
-echo $level->getLabel();       // Moyen
-echo $level->getPercentage();  // 60%
-```
+> **💡 Conseil** : Vous pouvez ajouter, supprimer ou modifier ces rôles en créant votre propre enum comme expliqué dans la section [Extensibilité](#extensibilité).
 
 ---
 
 ## 📚 Référence de l'API
 
-### RatingService
+### RattachmentService
 
 | Méthode | Description | Retourne |
 |---------|-------------|----------|
-| `rate(Model $rater, Model $rateable, RatingLevel $rating, ?string $review)` | Crée une évaluation | `Model` |
-| `updateRating(Model $rater, Model $rateable, RatingLevel $rating, ?string $review)` | Modifie une évaluation | `Model` |
-| `deleteRating(Model $rater, Model $rateable)` | Supprime une évaluation | `void` |
-| `hasRated(Model $rater, Model $rateable)` | Vérifie si une évaluation existe | `bool` |
-| `getRaterRating(Model $rater, Model $rateable)` | Récupère l'évaluation d'un utilisateur | `?Model` |
-| `getRatings(Model $rateable, ?RatingLevel $minRating, ?RatingLevel $maxRating)` | Récupère les évaluations d'un objet | `Collection` |
-| `getRatingsByRater(Model $rater)` | Récupère les évaluations d'un utilisateur | `Collection` |
-| `getAverageRating(Model $rateable)` | Calcule la note moyenne | `float` |
-| `getRatingDistribution(Model $rateable)` | Obtient la distribution des notes | `array` |
-| `countRatings(Model $rateable)` | Compte les évaluations | `int` |
-| `countRatingsByLevel(Model $rateable, RatingLevel $level)` | Compte les évaluations par niveau | `int` |
-
-### RatingRepository
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `getAverageRating(Model $rateable)` | Calcule la note moyenne | `float` |
-| `getRatingDistribution(Model $rateable)` | Obtient la distribution des notes | `array` |
+| `attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = [])` | Crée un rattachement | `Model` |
+| `attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = [])` | Rattache plusieurs modèles à une cible | `Collection` |
+| `attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = [])` | Rattache un modèle à plusieurs cibles | `Collection` |
+| `detach(Model $rattachable, Model $target)` | Supprime un rattachement | `void` |
+| `detachMultiple(Collection $rattachables, Model $target)` | Supprime plusieurs rattachements | `void` |
+| `detachFromMultiple(Model $rattachable, Collection $targets)` | Supprime les rattachements d'un modèle vers plusieurs cibles | `void` |
+| `detachAll(Model $model)` | Supprime tous les rattachements d'un modèle | `void` |
+| `isAttached(Model $rattachable, Model $target)` | Vérifie si un modèle est rattaché | `bool` |
+| `hasRoleAttached(Model $target, EnumerableInterface $role)` | Vérifie si un rôle existe pour une cible | `bool` |
+| `getRattachables(Model $target)` | Récupère tous les modèles rattachés à une cible | `Collection` |
+| `getRattachablesPaginated(Model $target, int $perPage = 15, int $page = 1)` | Récupère les modèles rattachés paginés | `LengthAwarePaginator` |
+| `getTargets(Model $rattachable)` | Récupère toutes les cibles d'un modèle | `Collection` |
+| `getTargetsPaginated(Model $rattachable, int $perPage = 15, int $page = 1)` | Récupère les cibles paginées | `LengthAwarePaginator` |
+| `getRattachablesByRole(Model $target, EnumerableInterface $role)` | Récupère les modèles rattachés par rôle | `Collection` |
+| `getRattachablesByRolePaginated(Model $target, EnumerableInterface $role, int $perPage = 15, int $page = 1)` | Récupère les modèles rattachés par rôle paginés | `LengthAwarePaginator` |
+| `getTargetsByRole(Model $rattachable, EnumerableInterface $role)` | Récupère les cibles par rôle | `Collection` |
+| `getTargetsByRolePaginated(Model $rattachable, EnumerableInterface $role, int $perPage = 15, int $page = 1)` | Récupère les cibles par rôle paginées | `LengthAwarePaginator` |
+| `countRattachables(Model $target)` | Compte les rattachements d'une cible | `int` |
+| `countTargets(Model $rattachable)` | Compte les cibles d'un modèle | `int` |
+| `countRattachablesByRole(Model $target, EnumerableInterface $role)` | Compte les rattachements par rôle | `int` |
+| `countTargetsByRole(Model $rattachable, EnumerableInterface $role)` | Compte les cibles par rôle | `int` |
+| `getDistinctRolesForTarget(Model $target)` | Récupère les rôles distincts d'une cible | `Collection` |
+| `getDistinctRolesForRattachable(Model $rattachable)` | Récupère les rôles distincts d'un modèle | `Collection` |
+| `updateRole(Model $rattachable, Model $target, EnumerableInterface $role)` | Met à jour le rôle | `void` |
+| `updateRoleForMultiple(Collection $rattachables, Model $target, EnumerableInterface $role)` | Met à jour le rôle de plusieurs rattachements | `void` |
+| `updateMetadata(Model $rattachable, Model $target, array $metadata)` | Met à jour les métadonnées | `void` |
+| `mergeMetadata(Model $rattachable, Model $target, array $metadata)` | Fusionne les métadonnées | `void` |
+| `getAttachment(Model $rattachable, Model $target)` | Récupère un rattachement spécifique | `?Model` |
+| `hasAttachmentsBetween(Model $rattachable, Model $target)` | Vérifie l'existence d'un rattachement | `bool` |
+| `hasAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Vérifie l'existence de rattachements entre types | `bool` |
+| `getAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Récupère les rattachements entre types | `Collection` |
+| `deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType)` | Supprime tous les rattachements entre types | `int` |
+| `syncAttachments(Model $rattachable, array $targets)` | Synchronise les rattachements | `Collection` |
 
 ---
 
@@ -300,31 +461,22 @@ Le package supporte les Value Objects suivants :
 
 | Value Object | Description | Exemple |
 |--------------|-------------|---------|
-| `DateTimeVO` | Date/heure | `DateTimeVO::from('2024-01-01 12:00:00')` |
 | `StrictDataObject` | Métadonnées typées | `StrictDataObject::from(['key' => 'value'])` |
 
-### Accesseurs dans le modèle Rating
+### Accesseurs dans le modèle Rattachment
 
 ```php
-$rating = Rating::find(1);
+$attachment = Rattachment::find(1);
 
 // ✅ Accès via les accesseurs Eloquent (propriétés directement)
-$metadata = $rating->metadata;       // StrictDataObject|null
-$ratingLevel = $rating->rating_level; // RatingLevel (via cast)
-$review = $rating->review;           // string|null
+$createdAt = $attachment->created_at;       // Carbon
+$updatedAt = $attachment->updated_at;       // Carbon
+$metadata = $attachment->metadata;          // StrictDataObject|null
+$role = $attachment->role;                  // EnumerableInterface (votre enum)
 
 // ✅ Relations
-$rater = $rating->rater;          // Auteur (User, Admin, etc.)
-$rateable = $rating->rateable;    // Objet évalué (Product, Service, etc.)
-
-// ✅ Vérification des valeurs
-if ($rating->created_at) {
-    echo $rating->created_at->format('Y-m-d H:i:s');
-}
-
-if ($rating->metadata) {
-    $orderId = $rating->metadata->get('order_id');
-}
+$rattachable = $attachment->rattachable;    // Modèle rattaché (User, Doctor, etc.)
+$target = $attachment->target;              // Modèle cible (Hospital, Pharmacy, etc.)
 ```
 
 ---
@@ -332,23 +484,21 @@ if ($rating->metadata) {
 ## 📝 Structure de la base de données
 
 ```sql
-CREATE TABLE ratings (
+CREATE TABLE rattachments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    rater_type VARCHAR(255) NOT NULL,      -- Type de l'évaluateur
-    rater_id BIGINT UNSIGNED NOT NULL,     -- ID de l'évaluateur
-    rateable_type VARCHAR(255) NOT NULL,   -- Type de l'objet évalué
-    rateable_id BIGINT UNSIGNED NOT NULL,  -- ID de l'objet évalué
-    rating_level TINYINT NOT NULL,         -- 1, 2, 3, 4, 5
-    review TEXT NULL,                      -- Avis textuel
-    metadata JSON NULL,                    -- Métadonnées
+    rattachable_type VARCHAR(255) NOT NULL, -- Type du modèle rattaché
+    rattachable_id BIGINT UNSIGNED NOT NULL,-- ID du modèle rattaché
+    target_type VARCHAR(255) NOT NULL,      -- Type du modèle cible
+    target_id BIGINT UNSIGNED NOT NULL,     -- ID du modèle cible
+    role VARCHAR(50) NOT NULL,              -- Rôle (valeur de votre enum)
+    metadata JSON NULL,                     -- Métadonnées
     created_at TIMESTAMP NULL,
     updated_at TIMESTAMP NULL,
-    deleted_at TIMESTAMP NULL,
     
-    UNIQUE INDEX idx_unique_rating (rater_type, rater_id, rateable_type, rateable_id),
-    INDEX idx_rater (rater_type, rater_id),
-    INDEX idx_rateable (rateable_type, rateable_id),
-    INDEX idx_rating_level (rating_level)
+    UNIQUE INDEX idx_unique_rattachment (rattachable_type, rattachable_id, target_type, target_id),
+    INDEX idx_rattachable (rattachable_type, rattachable_id),
+    INDEX idx_target (target_type, target_id),
+    INDEX idx_role (role)
 );
 ```
 
@@ -357,157 +507,97 @@ CREATE TABLE ratings (
 ## 🔍 Exemple complet
 
 ```php
-use AndyDefer\LaravelRattachments\Services\RatingService;
-use AndyDefer\LaravelRattachments\Enums\RatingLevel;
-use Illuminate\Http\Request;
+<?php
 
-class ProductReviewController extends Controller
+declare(strict_types=1);
+
+use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Enums\Role;
+use App\Models\User;
+use App\Models\Hospital;
+use App\Models\Pharmacy;
+
+class HospitalController extends Controller
 {
     public function __construct(
-        private readonly RatingService $ratingService
+        private readonly RattachmentService $service
     ) {}
 
-    public function store(Request $request, Product $product)
+    public function attachDoctor(Request $request, Hospital $hospital)
     {
-        $user = $request->user();
+        $doctor = User::find($request->input('doctor_id'));
 
-        // Vérifier si l'utilisateur a déjà acheté le produit
-        if (!$user->hasPurchased($product)) {
-            return response()->json([
-                'error' => 'Vous devez acheter le produit pour donner un avis'
-            ], 403);
-        }
-
-        // Vérifier si l'utilisateur a déjà donné un avis
-        if ($this->ratingService->hasRated($user, $product)) {
-            return response()->json([
-                'error' => 'Vous avez déjà donné votre avis sur ce produit'
-            ], 422);
-        }
-
-        try {
-            $rating = $this->ratingService->rate(
-                rater: $user,
-                rateable: $product,
-                rating: RatingLevel::from($request->input('rating')),
-                review: $request->input('review')
-            );
-
-            return response()->json([
-                'message' => 'Avis publié avec succès',
-                'rating' => $rating,
-                'average' => $this->ratingService->getAverageRating($product),
-                'total' => $this->ratingService->countRatings($product)
-            ], 201);
-
-        } catch (RuntimeException $e) {
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 422);
-        }
-    }
-
-    public function show(Product $product)
-    {
-        $distribution = $this->ratingService->getRatingDistribution($product);
-        $total = $this->ratingService->countRatings($product);
-        $average = $this->ratingService->getAverageRating($product);
-        $ratings = $this->ratingService->getRatings($product);
+        // Rattacher le médecin
+        $attachment = $this->service->attach(
+            $doctor,
+            $hospital,
+            Role::DOCTOR,
+            [
+                'consultation_days' => $request->input('days', ['monday', 'wednesday']),
+                'consultation_hours' => $request->input('hours', '09:00-17:00'),
+                'department' => $request->input('department'),
+            ]
+        );
 
         return response()->json([
-            'average_rating' => $average,
-            'total_reviews' => $total,
-            'distribution' => $distribution,
-            'reviews' => $ratings->map(function ($rating) {
-                return [
-                    'id' => $rating->id,
-                    'user' => $rating->rater->name,
-                    'rating' => $rating->rating_level->value,
-                    'stars' => $rating->rating_level->getStars(),
-                    'review' => $rating->review,
-                    'created_at' => $rating->created_at?->format('Y-m-d H:i:s')
-                ];
-            })
+            'message' => 'Médecin rattaché avec succès',
+            'attachment' => $attachment,
         ]);
     }
 
-    public function update(Request $request, Product $product)
+    public function getDoctors(Hospital $hospital)
     {
-        $user = $request->user();
+        // Récupérer tous les médecins avec pagination
+        $doctors = $this->service->getRattachablesByRolePaginated(
+            $hospital,
+            Role::DOCTOR,
+            15,
+            $request->input('page', 1)
+        );
 
-        try {
-            $updated = $this->ratingService->updateRating(
-                rater: $user,
-                rateable: $product,
-                rating: RatingLevel::from($request->input('rating')),
-                review: $request->input('review')
-            );
-
-            return response()->json([
-                'message' => 'Avis mis à jour',
-                'rating' => $updated
-            ]);
-
-        } catch (RuntimeException $e) {
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 404);
-        }
+        return response()->json($doctors);
     }
 
-    public function destroy(Product $product)
+    public function syncDoctor(Request $request, Hospital $hospital)
     {
-        $user = request()->user();
+        $doctor = User::find($request->input('doctor_id'));
 
-        try {
-            $this->ratingService->deleteRating($user, $product);
-
-            return response()->json([
-                'message' => 'Avis supprimé avec succès'
-            ]);
-
-        } catch (RuntimeException $e) {
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
-
-    public function myReviews(Request $request)
-    {
-        $user = $request->user();
-        $ratings = $this->ratingService->getRatingsByRater($user);
+        // Synchroniser les rattachements du médecin
+        $attachments = $this->service->syncAttachments($doctor, [
+            [
+                'target' => $hospital,
+                'role' => Role::DOCTOR,
+                'metadata' => ['primary' => true],
+            ],
+            [
+                'target' => Pharmacy::find($request->input('pharmacy_id')),
+                'role' => Role::PHARMACIST,
+            ],
+        ]);
 
         return response()->json([
-            'total' => $ratings->count(),
-            'reviews' => $ratings
+            'message' => 'Rattachements synchronisés',
+            'attachments' => $attachments,
         ]);
     }
 
-    public function stats(Product $product)
+    public function stats(Hospital $hospital)
     {
-        $distribution = $this->ratingService->getRatingDistribution($product);
-        $total = $this->ratingService->countRatings($product);
-        $average = $this->ratingService->getAverageRating($product);
+        return response()->json([
+            'total_doctors' => $this->service->countRattachablesByRole($hospital, Role::DOCTOR),
+            'total_staff' => $this->service->countRattachablesByRole($hospital, Role::STAFF),
+            'distinct_roles' => $this->service->getDistinctRolesForTarget($hospital),
+        ]);
+    }
 
-        // Préparer les données pour l'affichage
-        $formattedDistribution = [];
-        foreach (RatingLevel::cases() as $level) {
-            $formattedDistribution[$level->value] = [
-                'label' => $level->getLabel(),
-                'stars' => $level->getStars(),
-                'count' => $distribution[$level->value] ?? 0,
-                'percentage' => $total > 0 
-                    ? round(($distribution[$level->value] ?? 0) / $total * 100, 1)
-                    : 0
-            ];
-        }
+    public function detachDoctor(Request $request, Hospital $hospital)
+    {
+        $doctor = User::find($request->input('doctor_id'));
+
+        $this->service->detach($doctor, $hospital);
 
         return response()->json([
-            'product' => $product->name,
-            'average_rating' => $average,
-            'total_reviews' => $total,
-            'distribution' => $formattedDistribution
+            'message' => 'Médecin détaché avec succès',
         ]);
     }
 }
@@ -521,12 +611,6 @@ class ProductReviewController extends Controller
 
 ```bash
 composer test
-```
-
-### Exécuter uniquement les tests unitaires
-
-```bash
-composer test-unit
 ```
 
 ### Exécuter uniquement les tests d'intégration
@@ -558,27 +642,11 @@ Le package utilise `orchestra/testbench` pour les tests d'intégration avec une 
 
 ---
 
-## 🤝 Contribuer
-
-Veuillez consulter [CONTRIBUTING](CONTRIBUTING.md) pour plus de détails.
-
-### Flux de développement
-
-1. Forkez le dépôt
-2. Créez une branche de fonctionnalité (`git checkout -b feature/amazing-feature`)
-3. Apportez vos modifications
-4. Exécutez les tests (`composer test`)
-5. Committez vos modifications (`git commit -m 'Ajouter une fonctionnalité géniale'`)
-6. Poussez vers la branche (`git push origin feature/amazing-feature`)
-7. Ouvrez une Pull Request
-
----
-
 ## 📦 Dépendances
 
 - [`andydefer/php-vo`](https://github.com/andydefer/php-vo) - Value Objects
-- [`andydefer/laravel-repository`](https://github.com/andydefer/laravel-repository) - Implémentation du pattern Repository
-- [`andydefer/domain-structures`](https://github.com/andydefer/domain-structures) - Structures de domaine (AbstractRecord, AbstractData)
+- [`andydefer/laravel-repository`](https://github.com/andydefer/laravel-repository) - Pattern Repository et Enum Casts
+- [`andydefer/domain-structures`](https://github.com/andydefer/domain-structures) - Structures de domaine (AbstractRecord, AbstractData, StrictDataObject)
 
 ---
 
@@ -602,25 +670,4 @@ Si vous trouvez ce package utile, n'hésitez pas à lui donner une ⭐ sur GitHu
 
 ---
 
-## 🙏 Remerciements
-
-- Framework Laravel
-- Tous les contributeurs et utilisateurs de ce package
-
----
-
 **Construit avec ❤️ pour la communauté Laravel**
-```
-
----
-
-## 📋 Résumé des modifications
-
-| Avant (obsolète) | Après (correct) |
-|------------------|-----------------|
-| `$rating->getCreatedAt()` | `$rating->created_at` |
-| `$rating->getUpdatedAt()` | `$rating->updated_at` |
-| `$rating->getDeletedAt()` | `$rating->deleted_at` |
-| `$rating->getMetadata()` | `$rating->metadata` |
-| `$rating->getRatingLevel()` | `$rating->rating_level` |
-| `$rating->getReview()` | `$rating->review` |
