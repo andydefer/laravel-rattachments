@@ -21,7 +21,7 @@ use AndyDefer\Repository\Contracts\EnumerableInterface;
  */
 final class UnknownRole implements EnumerableInterface
 {
-    private function __construct(private readonly string|int $value) {}
+    private function __construct(public readonly string|int $value) {}
 
     /**
      * Creates a new UnknownRole instance.

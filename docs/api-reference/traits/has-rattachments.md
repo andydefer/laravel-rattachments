@@ -2,92 +2,99 @@
 
 ## Description
 
-Trait Eloquent qui fournit une API fluide pour gérer les rattachements polymorphiques directement depuis les modèles, sans avoir à injecter le service manuellement.
+Trait PHP pour les modèles Eloquent qui peuvent avoir des attachements polymorphes. Fournit une API fluide pour lire et interroger les attachements directement depuis le modèle.
 
 ## Hiérarchie / Implémentations
 
 ```
-Model (Eloquent)
-    └── use HasRattachments
+Trait
+    └── HasRattachments
 ```
-
-**Dépendances :**
-- `RattachmentService` - Service de rattachement
-- `EnumerableInterface` - Interface pour les rôles
 
 ## Rôle principal
 
-Le trait agit comme un **wrapper fluide** autour du `RattachmentService`. Il permet d'utiliser les fonctionnalités de rattachement directement sur les modèles, rendant le code plus lisible et plus proche du langage naturel.
+Ce trait permet à n'importe quel modèle Eloquent de bénéficier des fonctionnalités d'attachement polymorphe sans avoir à injecter et utiliser manuellement le `RattachmentService`. Il expose une API intuitive directement sur le modèle, améliorant la lisibilité et la fluidité du code.
 
-## API
-
-### `attachTo(Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model`
-
-Attache le modèle courant à un autre modèle.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$target` | `Model` | Modèle cible du rattachement |
-| `$role` | `EnumerableInterface|null` | Rôle du rattachement (optionnel) |
-| `$metadata` | `array<string, mixed>` | Métadonnées supplémentaires |
-
-**Retourne :** `Model` - L'instance de `Rattachment` créée
-
-**Exceptions :**
-- `RuntimeException` - Si le rattachement existe déjà
-- `RuntimeException` - Si les contraintes sont violées
-
-**Exemple :**
-```php
-$user->attachTo($hospital, Role::DOCTOR, [
-    'consultation_days' => ['monday', 'wednesday'],
-]);
-```
-
----
-
-### `detachFrom(Model $target): void`
-
-Détache le modèle courant d'un autre modèle.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$target` | `Model` | Modèle cible à détacher |
-
-**Exceptions :** `RuntimeException` - Si le rattachement n'existe pas
-
-**Exemple :**
-```php
-$user->detachFrom($hospital);
-```
-
----
-
-### `detachAll(): void`
-
-Supprime tous les rattachements du modèle (à la fois comme `rattachable` ET comme `target`).
-
-**Exemple :**
-```php
-$user->detachAll();
-```
-
----
+## API / Méthodes publiques
 
 ### `isAttachedTo(Model $target): bool`
-
-Vérifie si le modèle courant est attaché à un autre modèle.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$target` | `Model` | Modèle cible à vérifier |
 
-**Retourne :** `bool` - `true` si le modèle est rattaché à la cible
+**Retourne :** `bool` - `true` si le modèle est attaché à la cible
 
 **Exemple :**
 ```php
+$user = User::find(1);
+$hospital = Hospital::find(5);
+
 if ($user->isAttachedTo($hospital)) {
-    // ...
+    echo "L'utilisateur est attaché à l'hôpital";
+}
+```
+
+---
+
+### `hasRoleAttachedTo(Model $target, EnumerableInterface $role): bool`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model` | Modèle cible |
+| `$role` | `EnumerableInterface` | Rôle à vérifier |
+
+**Retourne :** `bool` - `true` si la cible a le rôle spécifié
+
+**Exemple :**
+```php
+$user = User::find(1);
+$hospital = Hospital::find(5);
+
+if ($user->hasRoleAttachedTo($hospital, Role::CHIEF)) {
+    echo "L'utilisateur est médecin chef de cet hôpital";
+}
+```
+
+---
+
+### `getAttachment(Model $target): ?Model`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model` | Modèle cible |
+
+**Retourne :** `Model|null` - L'attachement ou `null`
+
+**Exemple :**
+```php
+$user = User::find(1);
+$hospital = Hospital::find(5);
+
+$attachment = $user->getAttachment($hospital);
+if ($attachment) {
+    echo $attachment->role->getValue();
+    print_r($attachment->metadata);
+}
+```
+
+---
+
+### `hasAttachmentsBetween(Model $target): bool`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model` | Modèle cible |
+
+**Retourne :** `bool` - `true` si un attachement existe
+
+**Exemple :**
+```php
+$user = User::find(1);
+$hospital = Hospital::find(5);
+
+if ($user->hasAttachmentsBetween($hospital)) {
+    echo "Un attachement existe entre l'utilisateur et l'hôpital";
 }
 ```
 
@@ -95,20 +102,38 @@ if ($user->isAttachedTo($hospital)) {
 
 ### `getTargets(): Collection`
 
-Retourne toutes les cibles du modèle courant.
-
-**Retourne :** `Collection<int, Model>` - Tous les modèles cibles rattachés
+**Retourne :** `Collection<int, Model>` - Collection des cibles attachées
 
 **Exemple :**
 ```php
+$user = User::find(1);
 $hospitals = $user->getTargets();
+
+foreach ($hospitals as $hospital) {
+    echo $hospital->name . "\n";
+}
+```
+
+---
+
+### `getTargetsPaginated(int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$perPage` | `int` | Éléments par page |
+| `$page` | `int` | Numéro de la page |
+
+**Retourne :** `LengthAwarePaginator` - Résultats paginés
+
+**Exemple :**
+```php
+$user = User::find(1);
+$hospitals = $user->getTargetsPaginated(10, 2);
 ```
 
 ---
 
 ### `getTargetsByRole(EnumerableInterface $role): Collection`
-
-Retourne les cibles du modèle courant avec un rôle spécifique.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -118,120 +143,95 @@ Retourne les cibles du modèle courant avec un rôle spécifique.
 
 **Exemple :**
 ```php
+$user = User::find(1);
 $hospitals = $user->getTargetsByRole(Role::DOCTOR);
 ```
 
 ---
 
-### `getTargetsByType(string $targetClass): Collection`
-
-Retourne les cibles du modèle courant d'un type spécifique.
+### `getTargetsByRolePaginated(EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$targetClass` | `string` | FQCN de la classe cible (ex: `Hospital::class`) |
+| `$role` | `EnumerableInterface` | Rôle à filtrer |
+| `$perPage` | `int` | Éléments par page |
+| `$page` | `int` | Numéro de la page |
+
+**Retourne :** `LengthAwarePaginator` - Résultats paginés
+
+---
+
+### `getTargetsByType(string $targetClass): Collection`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$targetClass` | `string` | FQCN de la classe cible |
 
 **Retourne :** `Collection<int, Model>` - Cibles du type spécifié
 
 **Exemple :**
 ```php
-$hospitals = $user->getTargetsByType(Hospital::class);
+$user = User::find(1);
+$posts = $user->getTargetsByType(Post::class);
 ```
 
 ---
 
 ### `getTargetsByTypePaginated(string $targetClass, int $perPage = 15, int $page = 1): LengthAwarePaginator`
 
-Retourne les cibles d'un type spécifique avec pagination.
-
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$targetClass` | `string` | FQCN de la classe cible |
 | `$perPage` | `int` | Éléments par page |
-| `$page` | `int` | Numéro de page |
+| `$page` | `int` | Numéro de la page |
 
 **Retourne :** `LengthAwarePaginator` - Résultats paginés
-
-**Exemple :**
-```php
-$hospitals = $user->getTargetsByTypePaginated(Hospital::class, 10, 1);
-```
-
----
-
-### `getTargetsPaginated(int $perPage = 15, int $page = 1): LengthAwarePaginator`
-
-Retourne toutes les cibles avec pagination.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$perPage` | `int` | Éléments par page |
-| `$page` | `int` | Numéro de page |
-
-**Retourne :** `LengthAwarePaginator` - Résultats paginés
-
-**Exemple :**
-```php
-$hospitals = $user->getTargetsPaginated(10, 1);
-```
 
 ---
 
 ### `getTargetsByTypeAndRole(string $targetClass, EnumerableInterface $role): Collection`
-
-Retourne les cibles d'un type spécifique avec un rôle spécifique.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$targetClass` | `string` | FQCN de la classe cible |
 | `$role` | `EnumerableInterface` | Rôle à filtrer |
 
-**Retourne :** `Collection<int, Model>` - Cibles filtrées par type et rôle
+**Retourne :** `Collection<int, Model>` - Cibles du type et rôle spécifiés
 
 **Exemple :**
 ```php
-$hospitals = $user->getTargetsByTypeAndRole(Hospital::class, Role::DOCTOR);
+$user = User::find(1);
+$adminPosts = $user->getTargetsByTypeAndRole(Post::class, PostRole::ADMIN);
 ```
 
 ---
 
 ### `getTargetsByTypeAndRoles(string $targetClass, array $roles): Collection`
 
-Retourne les cibles d'un type spécifique avec plusieurs rôles.
-
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$targetClass` | `string` | FQCN de la classe cible |
 | `$roles` | `array<int, EnumerableInterface>` | Rôles à filtrer |
 
-**Retourne :** `Collection<int, Model>` - Cibles avec l'un des rôles
-
-**Exemple :**
-```php
-$hospitals = $user->getTargetsByTypeAndRoles(
-    Hospital::class, 
-    [Role::DOCTOR, Role::ADMIN]
-);
-```
+**Retourne :** `Collection<int, Model>` - Cibles du type avec un des rôles
 
 ---
 
 ### `getTargetsByTypesAndRoles(array $targetClasses, array $roles): Collection`
 
-Retourne les cibles de plusieurs types avec plusieurs rôles.
-
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$targetClasses` | `array<int, string>` | FQCNs des classes cibles |
+| `$targetClasses` | `array<int, string>` | FQCN des classes cibles |
 | `$roles` | `array<int, EnumerableInterface>` | Rôles à filtrer |
 
-**Retourne :** `Collection<int, Model>` - Cibles filtrées
+**Retourne :** `Collection<int, Model>` - Cibles des types avec un des rôles
 
 **Exemple :**
 ```php
+$user = User::find(1);
 $targets = $user->getTargetsByTypesAndRoles(
-    [Hospital::class, Pharmacy::class], 
-    [Role::DOCTOR, Role::PHARMACIST]
+    [Post::class, Comment::class],
+    [Role::ADMIN, Role::EDITOR]
 );
 ```
 
@@ -239,20 +239,18 @@ $targets = $user->getTargetsByTypesAndRoles(
 
 ### `countTargets(): int`
 
-Compte toutes les cibles du modèle courant.
-
 **Retourne :** `int` - Nombre total de cibles
 
 **Exemple :**
 ```php
-$count = $user->countTargets();
+$user = User::find(1);
+$total = $user->countTargets();
+echo "Total d'attachements: $total";
 ```
 
 ---
 
 ### `countTargetsByRole(EnumerableInterface $role): int`
-
-Compte les cibles du modèle courant avec un rôle spécifique.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -260,205 +258,215 @@ Compte les cibles du modèle courant avec un rôle spécifique.
 
 **Retourne :** `int` - Nombre de cibles avec ce rôle
 
-**Exemple :**
-```php
-$doctorCount = $user->countTargetsByRole(Role::DOCTOR);
-```
-
----
-
-### `updateRoleFor(Model $target, EnumerableInterface $role): void`
-
-Met à jour le rôle pour une cible spécifique.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$target` | `Model` | Modèle cible |
-| `$role` | `EnumerableInterface` | Nouveau rôle |
-
-**Exceptions :** `RuntimeException` - Si le rattachement n'existe pas
-
-**Exemple :**
-```php
-$user->updateRoleFor($hospital, Role::ADMIN);
-```
-
----
-
-### `updateMetadataFor(Model $target, array $metadata): void`
-
-Met à jour les métadonnées pour une cible spécifique.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$target` | `Model` | Modèle cible |
-| `$metadata` | `array<string, mixed>` | Nouvelles métadonnées |
-
-**Exceptions :** `RuntimeException` - Si le rattachement n'existe pas
-
-**Exemple :**
-```php
-$user->updateMetadataFor($hospital, [
-    'consultation_hours' => '10:00-18:00',
-]);
-```
-
----
-
-### `mergeMetadataFor(Model $target, array $metadata): void`
-
-Fusionne les métadonnées pour une cible spécifique.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$target` | `Model` | Modèle cible |
-| `$metadata` | `array<string, mixed>` | Métadonnées à fusionner |
-
-**Exceptions :** `RuntimeException` - Si le rattachement n'existe pas
-
-**Exemple :**
-```php
-$user->mergeMetadataFor($hospital, [
-    'availability' => 'Monday-Friday',
-]);
-```
-
 ---
 
 ### `getDistinctRoles(): Collection`
-
-Retourne tous les rôles distincts du modèle courant.
 
 **Retourne :** `Collection<int, EnumerableInterface>` - Rôles distincts
 
 **Exemple :**
 ```php
+$user = User::find(1);
 $roles = $user->getDistinctRoles();
-// Collection [Role::DOCTOR, Role::ADMIN, Role::PHARMACIST]
+// ['doctor', 'admin', 'staff']
 ```
 
 ---
 
-### `syncAttachments(array $targets): Collection`
+### `getRattachables(): Collection`
 
-Synchronise les rattachements du modèle courant.
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$targets` | `array<array{target: Model, role?: EnumerableInterface, metadata?: array<string, mixed>}>` | Cibles avec rôles optionnels |
-
-**Retourne :** `Collection<int, Model>` - Rattachements créés ou mis à jour
-
-**Exceptions :** `RuntimeException` - Si une cible est invalide
+**Retourne :** `Collection<int, Model>` - Modèles attachés à ce modèle (quand il est utilisé comme cible)
 
 **Exemple :**
 ```php
-$user->syncAttachments([
-    ['target' => $hospital1, 'role' => Role::DOCTOR],
-    ['target' => $hospital2, 'role' => Role::DOCTOR],
-]);
+$hospital = Hospital::find(1);
+$users = $hospital->getRattachables();
 ```
 
 ---
 
+### `getRattachablesPaginated(int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$perPage` | `int` | Éléments par page |
+| `$page` | `int` | Numéro de la page |
+
+**Retourne :** `LengthAwarePaginator` - Résultats paginés
+
+---
+
+### `getRattachablesByRole(EnumerableInterface $role): Collection`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$role` | `EnumerableInterface` | Rôle à filtrer |
+
+**Retourne :** `Collection<int, Model>` - Modèles attachés avec ce rôle
+
+**Exemple :**
+```php
+$hospital = Hospital::find(1);
+$chiefs = $hospital->getRattachablesByRole(Role::CHIEF);
+```
+
+---
+
+### `getRattachablesByRolePaginated(EnumerableInterface $role, int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$role` | `EnumerableInterface` | Rôle à filtrer |
+| `$perPage` | `int` | Éléments par page |
+| `$page` | `int` | Numéro de la page |
+
+**Retourne :** `LengthAwarePaginator` - Résultats paginés
+
+---
+
+### `countRattachables(): int`
+
+**Retourne :** `int` - Nombre total de modèles attachés
+
+---
+
+### `countRattachablesByRole(EnumerableInterface $role): int`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$role` | `EnumerableInterface` | Rôle à filtrer |
+
+**Retourne :** `int` - Nombre de modèles attachés avec ce rôle
+
+---
+
+### `getDistinctRolesForTarget(): Collection`
+
+**Retourne :** `Collection<int, EnumerableInterface>` - Rôles distincts pour ce modèle comme cible
+
+**Exemple :**
+```php
+$hospital = Hospital::find(1);
+$roles = $hospital->getDistinctRolesForTarget();
+// ['doctor', 'nurse', 'admin']
+```
+
 ## Cas d'utilisation
 
-### Cas 1 : Gestion des médecins et hôpitaux
+### Cas 1 : Gestion des hôpitaux d'un médecin
+
+**Problème :** Un médecin travaille dans plusieurs hôpitaux avec des rôles différents.
+
+**Solution :** Utiliser les méthodes du trait pour interroger et afficher les relations.
 
 ```php
-class Doctor extends Model
-{
-    use HasRattachments;
-}
+$doctor = User::find(1);
 
-$doctor = Doctor::find(1);
+// Récupérer tous les hôpitaux
+$hospitals = $doctor->getTargets();
+
+// Récupérer les hôpitaux où il est chef
+$chiefHospitals = $doctor->getTargetsByRole(Role::CHIEF);
+
+// Afficher les détails
+foreach ($hospitals as $hospital) {
+    $attachment = $doctor->getAttachment($hospital);
+    echo $hospital->name . ': ' . $attachment->role->getValue();
+    if ($attachment->metadata) {
+        echo ' (' . $attachment->metadata['department'] . ')';
+    }
+}
+```
+
+### Cas 2 : Dashboard d'un hôpital
+
+**Problème :** Afficher les statistiques d'un hôpital.
+
+**Solution :** Utiliser les méthodes de comptage.
+
+```php
 $hospital = Hospital::find(1);
 
-// Rattacher le médecin à l'hôpital
-$doctor->attachTo($hospital, Role::DOCTOR, [
-    'consultation_days' => ['monday', 'wednesday', 'friday'],
-    'department' => 'Cardiology',
-]);
+$totalStaff = $hospital->countRattachables();
+$doctors = $hospital->countRattachablesByRole(Role::DOCTOR);
+$nurses = $hospital->countRattachablesByRole(Role::NURSE);
+$chiefs = $hospital->countRattachablesByRole(Role::CHIEF);
 
-// Récupérer tous les hôpitaux du médecin
-$hospitals = $doctor->getTargetsByRole(Role::DOCTOR);
-
-// Récupérer les hôpitaux avec pagination
-$hospitals = $doctor->getTargetsByTypePaginated(Hospital::class, 10, 1);
-
-// Mettre à jour le rôle
-$doctor->updateRoleFor($hospital, Role::STAFF);
-
-// Détacher le médecin
-$doctor->detachFrom($hospital);
+echo "Total staff: $totalStaff\n";
+echo "Doctors: $doctors\n";
+echo "Nurses: $nurses\n";
+echo "Chiefs: $chiefs\n";
 ```
 
-### Cas 2 : Relations patient-médecin
+### Cas 3 : Gestion des tags d'un article
+
+**Problème :** Afficher et filtrer les tags d'un article.
+
+**Solution :** Utiliser les méthodes de filtrage par type et rôle.
 
 ```php
-class Patient extends Model
-{
-    use HasRattachments;
+$post = Post::find(1);
+
+// Tous les tags
+$allTags = $post->getTargets();
+
+// Tags principaux
+$primaryTags = $post->getTargetsByTypeAndRole(Tag::class, TagRole::PRIMARY);
+
+// Tags par catégorie
+$tagCategories = $post->getTargetsByTypeAndRole(TagCategory::class, TagRole::CATEGORY);
+
+// Afficher les tags groupés
+echo "Primary tags:\n";
+foreach ($primaryTags as $tag) {
+    echo "  - " . $tag->name . "\n";
 }
-
-$patient = Patient::find(1);
-$doctor = Doctor::find(1);
-
-// Un patient est suivi par un médecin
-$patient->attachTo($doctor, Role::PATIENT_OF, [
-    'since' => '2024-01-15',
-    'referral' => 'general_practitioner',
-]);
-
-// Récupérer les médecins d'un patient
-$doctors = $patient->getTargetsByType(Doctor::class);
-
-// Récupérer les patients d'un médecin
-$patients = $doctor->getTargetsByType(Patient::class);
-```
-
-### Cas 3 : Synchronisation des rattachements
-
-```php
-// Synchroniser tous les rattachements d'un médecin
-$doctor->syncAttachments([
-    ['target' => $hospital1, 'role' => Role::DOCTOR, 'metadata' => ['primary' => true]],
-    ['target' => $hospital2, 'role' => Role::DOCTOR],
-    ['target' => $pharmacy, 'role' => Role::PHARMACIST],
-]);
-
-// Les rattachements précédents sont automatiquement supprimés
 ```
 
 ## Gestion des erreurs
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Rattachement déjà existant | `RuntimeException` | `{rattachable} {rattachable_id} is already attached to {target} {target_id}` |
-| Rattachement inexistant | `RuntimeException` | `{rattachable} {rattachable_id} is not attached to {target} {target_id}` |
-| Target non autorisé | `RuntimeException` | `{rattachable} cannot be attached to {target}. Allowed targets: ...` |
-| Rôle non autorisé | `RuntimeException` | `Role "{role}" is not allowed for {rattachable} -> {target}. Allowed roles: ...` |
+| Aucune (lecture seule) | Aucune | - |
+
+**Note :** Ce trait ne contient que des méthodes de lecture. Les méthodes d'écriture (`attachTo`, `detachFrom`, etc.) sont disponibles dans le trait mais ne sont pas documentées ici car le prompt demande uniquement les méthodes de lecture.
 
 ## Intégration
 
-Le trait s'intègre avec :
+Ce trait s'intègre avec :
 
-- **`RattachmentService`** - Service sous-jacent
-- **`RattachmentConstraintsInterface`** - Contraintes de rattachement
-- **`EnumerableInterface`** - Rôles
+- **RattachmentService** - Service central
+- **Rattachment** - Modèle Eloquent
+- **Eloquent** - ORM Laravel
 
 ## Performance
 
-- **Toutes les méthodes** : Délèguent au service, donc O(1) ou O(n)
-- **Aucune surcharge** : Le trait ajoute juste une couche d'abstraction
-- **Pagination** : Gérée par Eloquent avec des requêtes optimisées
+- Toutes les méthodes délèguent au `RattachmentService`
+- Les requêtes sont optimisées via le repository
+- Les méthodes de pagination limitent le nombre de résultats
+- Les méthodes de comptage utilisent `COUNT()` en base de données
+- **Attention :** Les méthodes `getTargets()` et `getRattachables()` chargent toutes les relations en mémoire
+
+### Optimisation recommandée
+
+```php
+// ⚠️ Éviter - Charge tout en mémoire
+$allTargets = $user->getTargets();
+
+// ✅ Recommandé - Utiliser la pagination
+$targets = $user->getTargetsPaginated(20);
+
+// ✅ Recommandé - Utiliser le comptage
+$count = $user->countTargets();
+```
 
 ## Compatibilité
 
-| Version PHP | Support |
-|-------------|---------|
-| PHP 8.2+ | ✅ Complet |
-| PHP 8.1 | ✅ Complet |
+| Version | Support |
+|---------|---------|
+| PHP 8.1+ | ✅ Complet |
+| PHP 8.0 | ✅ Complet |
+| Laravel 10+ | ✅ Complet |
 
 ## Exemple complet
 
@@ -467,60 +475,58 @@ Le trait s'intègre avec :
 
 declare(strict_types=1);
 
-namespace App\Models;
-
 use AndyDefer\LaravelRattachments\Traits\HasRattachments;
 use AndyDefer\LaravelRattachments\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class Doctor extends Model
+class User extends Model
 {
     use HasRattachments;
 }
 
-// Utilisation
-$doctor = Doctor::find(1);
-
-// 1. Rattacher à plusieurs entités
-$doctor->attachTo(Hospital::find(1), Role::DOCTOR, ['department' => 'Cardiology']);
-$doctor->attachTo(Hospital::find(2), Role::DOCTOR);
-$doctor->attachTo(Pharmacy::find(1), Role::PHARMACIST);
-
-// 2. Récupérer les cibles
-$hospitals = $doctor->getTargetsByRole(Role::DOCTOR);
-$pharmacies = $doctor->getTargetsByType(Pharmacy::class);
-$allTargets = $doctor->getTargets();
-
-// 3. Récupérer avec pagination
-$hospitalsPaginated = $doctor->getTargetsByTypePaginated(Hospital::class, 10, 1);
-
-// 4. Compter
-echo "Hôpitaux: " . $doctor->countTargetsByRole(Role::DOCTOR);
-echo "Pharmacies: " . $doctor->countTargetsByType(Pharmacy::class);
-
-// 5. Vérifier
-if ($doctor->isAttachedTo($hospital)) {
-    echo "Attached to hospital";
+class Hospital extends Model
+{
+    use HasRattachments;
 }
 
-// 6. Mettre à jour
-$doctor->updateRoleFor($hospital, Role::ADMIN);
-$doctor->mergeMetadataFor($hospital, ['primary' => true]);
+// 1. Récupérer un utilisateur
+$user = User::find(1);
 
-// 7. Synchroniser
-$doctor->syncAttachments([
-    ['target' => Hospital::find(1), 'role' => Role::DOCTOR],
-    ['target' => Hospital::find(2), 'role' => Role::DOCTOR],
-]);
+// 2. Vérifier les attachements
+if ($user->isAttachedTo($hospital)) {
+    echo "L'utilisateur est attaché\n";
+}
 
-// 8. Nettoyer
-$doctor->detachFrom($hospital);
-$doctor->detachAll(); // Supprime tout
+// 3. Récupérer les cibles
+$hospitals = $user->getTargets();
+foreach ($hospitals as $hospital) {
+    echo $hospital->name . "\n";
+}
+
+// 4. Filtrer par rôle
+$chiefs = $user->getTargetsByRole(Role::CHIEF);
+
+// 5. Compter
+$total = $user->countTargets();
+echo "Total: $total\n";
+
+// 6. Récupérer un attachement spécifique
+$attachment = $user->getAttachment($hospital);
+if ($attachment) {
+    echo $attachment->role->getValue() . "\n";
+}
+
+// 7. Rôles distincts
+$roles = $user->getDistinctRoles();
+
+// 8. Utiliser comme cible
+$hospital = Hospital::find(1);
+$doctors = $hospital->getRattachablesByRole(Role::DOCTOR);
 ```
 
 ## Voir aussi
 
-- `RattachmentService` - Service de rattachement
-- `Rattachment` - Modèle du rattachement
+- `RattachmentService` - Service central
+- `Rattachment` - Modèle Eloquent
+- `RattachmentServiceInterface` - Interface du service
 - `RattachmentConstraintsInterface` - Interface des contraintes
-- `Role` - Énumération des rôles par défaut
