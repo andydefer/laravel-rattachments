@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Tests;
 
+use AndyDefer\Directive\DirectiveServiceProvider;
 use AndyDefer\LaravelRattachments\RattachmentsServiceProvider;
+use AndyDefer\Repository\RepositoryServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class IntegrationTestCase extends Orchestra
@@ -24,6 +26,8 @@ abstract class IntegrationTestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            RepositoryServiceProvider::class,
+            DirectiveServiceProvider::class,
             RattachmentsServiceProvider::class,
         ];
     }
