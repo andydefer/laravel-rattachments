@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Contracts;
 
+use AndyDefer\LaravelRattachments\Contracts\Hooks\AttachmentHookInterface;
 use AndyDefer\Repository\Contracts\EnumerableInterface;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Interface for models that define attachment constraints.
+ *
+ * Extends AttachmentHookInterface to allow models to hook into the
+ * attachment lifecycle events.
  */
-interface RattachmentConstraintsInterface
+interface RattachmentInterface extends AttachmentHookInterface
 {
     /**
      * Define allowed targets for this model.

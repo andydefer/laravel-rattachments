@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Validation;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Contracts\Validation\ConstraintValidatorInterface;
 use AndyDefer\LaravelRattachments\Enums\UnknownRole;
 use AndyDefer\LaravelRattachments\Records\RattachmentFilterRecord;
@@ -31,19 +31,19 @@ final class ConstraintValidator implements ConstraintValidatorInterface
      */
     public function validateConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void
     {
-        if (! $rattachable instanceof RattachmentConstraintsInterface) {
+        if (! $rattachable instanceof RattachmentInterface) {
             throw new RuntimeException(sprintf(
                 'Model %s must implement %s to be attachable.',
                 get_class($rattachable),
-                RattachmentConstraintsInterface::class
+                RattachmentInterface::class
             ));
         }
 
-        if (! $target instanceof RattachmentConstraintsInterface) {
+        if (! $target instanceof RattachmentInterface) {
             throw new RuntimeException(sprintf(
                 'Model %s must implement %s to be a target.',
                 get_class($target),
-                RattachmentConstraintsInterface::class
+                RattachmentInterface::class
             ));
         }
 
@@ -58,7 +58,7 @@ final class ConstraintValidator implements ConstraintValidatorInterface
      */
     public function validateUniqueConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void
     {
-        if (! $rattachable instanceof RattachmentConstraintsInterface) {
+        if (! $rattachable instanceof RattachmentInterface) {
             return;
         }
 
@@ -342,12 +342,12 @@ final class ConstraintValidator implements ConstraintValidatorInterface
         Model $rattachable,
         string $rattachableClass
     ): void {
-        if (! $rattachable instanceof RattachmentConstraintsInterface) {
+        if (! $rattachable instanceof RattachmentInterface) {
             throw new RuntimeException(
                 sprintf(
                     'Rattachable model %s must implement %s.',
                     $rattachableClass,
-                    RattachmentConstraintsInterface::class
+                    RattachmentInterface::class
                 )
             );
         }

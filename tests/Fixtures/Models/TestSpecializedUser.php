@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Tests\Fixtures\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
+use AndyDefer\LaravelRattachments\Traits\HasRattachments;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -18,8 +19,10 @@ use Illuminate\Database\Eloquent\Model;
  * - A TestSpecializedUser can have many Specialty with SECONDARY role
  * - A TestSpecializedUser can have many User with FRIEND role
  */
-final class TestSpecializedUser extends Model implements RattachmentConstraintsInterface
+final class TestSpecializedUser extends Model implements RattachmentInterface
 {
+    use HasRattachments;
+
     protected $table = 'test_specialized_users';
 
     protected $fillable = [

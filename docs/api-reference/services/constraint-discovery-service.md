@@ -2,7 +2,7 @@
 
 ## Description
 
-Service de découverte automatique des modèles qui implémentent l'interface `RattachmentConstraintsInterface` en scannant les fichiers PHP d'un projet.
+Service de découverte automatique des modèles qui implémentent l'interface `RattachmentInterface` en scannant les fichiers PHP d'un projet.
 
 ## Hiérarchie / Implémentations
 
@@ -133,7 +133,7 @@ Ce service s'intègre avec :
 - **FileSystemInterface** (`AndyDefer\PhpServices`) - Opérations sur les fichiers
 - **nikic/php-parser** - Analyse AST
 - **ConstraintModelVisitor** - Visiteur personnalisé
-- **RattachmentConstraintsInterface** - Interface recherchée
+- **RattachmentInterface** - Interface recherchée
 
 ## Performance
 
@@ -201,6 +201,6 @@ foreach ($models as $className => $constraints) {
 ## Voir aussi
 
 - `ConstraintModelVisitor` - Visiteur AST utilisé
-- `RattachmentConstraintsInterface` - Interface recherchée
+- `RattachmentInterface` - Interface recherchée
 - `FileSystemInterface` - Service de fichiers
 - `Paths` - Utilitaire de chemins (Laravel Directive)

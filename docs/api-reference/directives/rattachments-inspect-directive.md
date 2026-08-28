@@ -13,7 +13,7 @@ AbstractDirective (AndyDefer\Directive)
 
 ## Rôle principal
 
-Cette directive offre une vue d'ensemble des relations d'attachement définies par les modèles implémentant `RattachmentConstraintsInterface`. Elle permet de :
+Cette directive offre une vue d'ensemble des relations d'attachement définies par les modèles implémentant `RattachmentInterface`. Elle permet de :
 
 - Visualiser les cibles autorisées (`allowedTargets`)
 - Visualiser les cibles uniques (`uniqueTargets`)
@@ -275,7 +275,7 @@ Cette directive s'intègre avec :
 
 ## Voir aussi
 
-- `RattachmentConstraintsInterface` - Interface pour les contraintes d'attachement
+- `RattachmentInterface` - Interface pour les contraintes d'attachement
 - `ConstraintDiscoveryService` - Service de découverte des modèles
 - `DirectiveTestingService` - Service de test des directives
 - `AbstractDirective` - Classe de base des directives Laravel Directive

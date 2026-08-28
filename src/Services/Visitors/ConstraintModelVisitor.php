@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Services\Visitors;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\Namespace_;
@@ -68,7 +68,7 @@ final class ConstraintModelVisitor extends NodeVisitorAbstract
                 $interfaceName = $implement->toString();
                 $resolvedName = $this->resolveAlias($interfaceName);
 
-                if ($resolvedName === RattachmentConstraintsInterface::class) {
+                if ($resolvedName === RattachmentInterface::class) {
                     $implementsConstraint = true;
                     break;
                 }

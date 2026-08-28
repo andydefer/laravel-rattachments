@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelRattachments\Services;
 
 use AndyDefer\Directive\Helpers\Paths;
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\ConstraintDiscoveryServiceInterface;
 use AndyDefer\LaravelRattachments\Services\Visitors\ConstraintModelVisitor;
 use AndyDefer\PhpServices\Contracts\FileSystemInterface;
@@ -45,12 +45,12 @@ final class ConstraintDiscoveryService implements ConstraintDiscoveryServiceInte
             }
 
             $reflection = new \ReflectionClass($modelClass);
-            if (! $reflection->implementsInterface(RattachmentConstraintsInterface::class)) {
+            if (! $reflection->implementsInterface(RattachmentInterface::class)) {
                 continue;
             }
 
             try {
-                /** @var RattachmentConstraintsInterface $instance */
+                /** @var RattachmentInterface $instance */
                 $instance = new $modelClass;
                 $allowedTargets = $instance->allowedTargets();
                 $uniqueTargets = method_exists($instance, 'uniqueTargets')

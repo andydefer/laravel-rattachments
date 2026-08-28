@@ -2,7 +2,7 @@
 
 ## Description
 
-Visiteur PHP Parser qui parcourt l'AST (Abstract Syntax Tree) d'un fichier PHP pour identifier les classes qui implémentent l'interface `RattachmentConstraintsInterface`.
+Visiteur PHP Parser qui parcourt l'AST (Abstract Syntax Tree) d'un fichier PHP pour identifier les classes qui implémentent l'interface `RattachmentInterface`.
 
 ## Hiérarchie / Implémentations
 
@@ -66,7 +66,7 @@ $models = $visitor->getModels();
 
 ### Cas 1 : Découverte automatique des modèles
 
-**Problème :** Vous avez 50 modèles dans votre application et vous voulez savoir lesquels implémentent `RattachmentConstraintsInterface`.
+**Problème :** Vous avez 50 modèles dans votre application et vous voulez savoir lesquels implémentent `RattachmentInterface`.
 
 **Solution :** Utiliser le visiteur pour scanner tous les fichiers.
 
@@ -130,15 +130,15 @@ Le visiteur gère correctement les alias d'importation :
 ```php
 // Fichier source
 use App\Models\User as UserModel;
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 
-class Hospital implements RattachmentConstraintsInterface
+class Hospital implements RattachmentInterface
 {
     // ...
 }
 ```
 
-Le visiteur résout `RattachmentConstraintsInterface` vers son FQCN complet.
+Le visiteur résout `RattachmentInterface` vers son FQCN complet.
 
 ## Gestion des erreurs
 
@@ -214,7 +214,7 @@ foreach ($files as $file) {
 // 5. Récupérer les résultats
 $models = $visitor->getModels();
 
-echo "Models implementing RattachmentConstraintsInterface:\n";
+echo "Models implementing RattachmentInterface:\n";
 foreach ($models as $model) {
     echo "  - {$model}\n";
 }
@@ -223,6 +223,6 @@ foreach ($models as $model) {
 ## Voir aussi
 
 - `ConstraintDiscoveryService` - Service utilisant ce visiteur
-- `RattachmentConstraintsInterface` - Interface détectée
+- `RattachmentInterface` - Interface détectée
 - `PhpParser\NodeVisitorAbstract` - Classe de base du visiteur
 - `PhpParser\Node` - Nœuds de l'AST analysés

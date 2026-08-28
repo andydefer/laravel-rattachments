@@ -1113,7 +1113,7 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
     public function test_unique_constraint_does_not_affect_models_without_interface(): void
     {
-        // TestUser n'implémente pas RattachmentConstraintsInterface
+        // TestUser n'implémente pas RattachmentInterface
         $user = TestUser::create([
             'name' => 'Normal User',
             'email' => 'normal@example.com',

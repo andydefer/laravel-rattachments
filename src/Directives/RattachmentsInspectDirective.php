@@ -9,7 +9,7 @@ use AndyDefer\Directive\AbstractDirective;
 use AndyDefer\Directive\Enums\ExitCode;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\DomainStructures\Utils\MapCollection;
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\ConstraintDiscoveryServiceInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -126,7 +126,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
             }
 
             $reflection = new \ReflectionClass($modelClass);
-            $implementsInterface = $reflection->implementsInterface(RattachmentConstraintsInterface::class);
+            $implementsInterface = $reflection->implementsInterface(RattachmentInterface::class);
 
             try {
                 $data = $this->buildModelData($modelClass, $implementsInterface);
@@ -146,7 +146,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
         $disallowedTargets = [];
 
         if ($implementsInterface) {
-            /** @var RattachmentConstraintsInterface $instance */
+            /** @var RattachmentInterface $instance */
             $instance = new $modelClass;
             $allowedTargets = $instance->allowedTargets();
 
@@ -190,7 +190,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
         $this->line("   FQCN: {$modelClass}");
 
         if (! ($data['implementsInterface'] ?? false)) {
-            $this->line('   ℹ️  No constraints defined (does not implement RattachmentConstraintsInterface)');
+            $this->line('   ℹ️  No constraints defined (does not implement RattachmentInterface)');
             $this->newLine();
 
             return;

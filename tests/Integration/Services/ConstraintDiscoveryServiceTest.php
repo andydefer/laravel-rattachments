@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Tests\Integration\Services;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\ConstraintDiscoveryServiceInterface;
 use AndyDefer\LaravelRattachments\Services\ConstraintDiscoveryService;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
@@ -130,7 +130,7 @@ final class ConstraintDiscoveryServiceTest extends IntegrationTestCase
         foreach ($constrainedClasses as $class) {
             $reflection = new \ReflectionClass($class);
             $this->assertTrue(
-                $reflection->implementsInterface(RattachmentConstraintsInterface::class)
+                $reflection->implementsInterface(RattachmentInterface::class)
             );
         }
     }

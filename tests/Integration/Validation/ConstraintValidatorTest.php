@@ -76,7 +76,7 @@ final class ConstraintValidatorTest extends IntegrationTestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface to be attachable.'
+            'Model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentInterface to be attachable.'
         );
 
         $this->validator->validateConstraints($rattachable, $this->post, Role::DOCTOR);
@@ -92,7 +92,7 @@ final class ConstraintValidatorTest extends IntegrationTestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface to be a target.'
+            'Model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentInterface to be a target.'
         );
 
         $this->validator->validateConstraints($rattachable, $target, Role::DOCTOR);
@@ -284,7 +284,7 @@ final class ConstraintValidatorTest extends IntegrationTestCase
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Rattachable model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface.'
+            'Rattachable model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentInterface.'
         );
 
         $this->validator->resolveRole(

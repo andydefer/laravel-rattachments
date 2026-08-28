@@ -1,4 +1,4 @@
-# RattachmentConstraintsInterface - Référence Technique
+# RattachmentInterface - Référence Technique
 
 ## Description
 
@@ -7,7 +7,7 @@ Interface optionnelle pour les modèles Eloquent qui définissent des contrainte
 ## Hiérarchie / Implémentations
 
 ```
-RattachmentConstraintsInterface
+RattachmentInterface
     └── Model (Eloquent)
 ```
 
@@ -108,11 +108,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class Hospital extends Model implements RattachmentConstraintsInterface
+final class Hospital extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -166,11 +166,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class User extends Model implements RattachmentConstraintsInterface
+final class User extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -205,11 +205,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class Doctor extends Model implements RattachmentConstraintsInterface
+final class Doctor extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -284,11 +284,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class User extends Model implements RattachmentConstraintsInterface
+final class User extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {

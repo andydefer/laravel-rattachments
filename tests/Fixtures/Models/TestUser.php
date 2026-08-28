@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Tests\Fixtures\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\TestUserRole;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\TestUserStatus;
+use AndyDefer\LaravelRattachments\Traits\HasRattachments;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class TestUser extends Model implements RattachmentConstraintsInterface
+class TestUser extends Model implements RattachmentInterface
 {
+    use HasRattachments;
+
     protected $table = 'test_users';
 
     protected $fillable = [

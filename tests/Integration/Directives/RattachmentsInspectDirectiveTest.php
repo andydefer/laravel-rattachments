@@ -181,7 +181,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
         );
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('does not implement RattachmentConstraintsInterface', $response->output);
+        $this->assertStringContainsString('does not implement RattachmentInterface', $response->output);
     }
 
     public function test_inspect_with_invalid_model_class(): void

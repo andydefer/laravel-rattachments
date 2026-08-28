@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Traits;
 
+use AndyDefer\DomainStructures\Utils\StrictDataObject;
+use AndyDefer\LaravelRattachments\Enums\HookPosition;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
 use AndyDefer\Repository\Contracts\EnumerableInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -453,5 +455,187 @@ trait HasRattachments
     public function getDistinctRolesForTarget(): Collection
     {
         return $this->getRattachmentService()->getDistinctRolesForTarget($this);
+    }
+
+    /*
+     * ┌─────────────────────────────────────────────────────────────┐
+     * │                     HOOK METHODS                           │
+     * └─────────────────────────────────────────────────────────────┘
+     */
+
+    /**
+     * Hook called before an attachment is created.
+     *
+     * Override this method to perform actions before an attachment is created.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  EnumerableInterface  $role  The role for the attachment
+     * @param  array<string, mixed>  $metadata  The metadata for the attachment
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function beforeAttach(
+        Model $other,
+        EnumerableInterface $role,
+        array $metadata,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called after an attachment is created.
+     *
+     * Override this method to perform actions after an attachment is created.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  EnumerableInterface  $role  The role for the attachment
+     * @param  Model  $attachment  The created attachment model
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function afterAttach(
+        Model $other,
+        EnumerableInterface $role,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called before an attachment is detached.
+     *
+     * Override this method to perform actions before an attachment is detached.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  Model  $attachment  The attachment model being deleted
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function beforeDetach(
+        Model $other,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called after an attachment is detached.
+     *
+     * Override this method to perform actions after an attachment is detached.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  Model  $attachment  The attachment model that was deleted
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function afterDetach(
+        Model $other,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called before an attachment role is updated.
+     *
+     * Override this method to perform actions before a role update.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  Model  $attachment  The attachment model being updated
+     * @param  EnumerableInterface  $oldRole  The old role
+     * @param  EnumerableInterface  $newRole  The new role
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function beforeUpdateRole(
+        Model $other,
+        Model $attachment,
+        EnumerableInterface $oldRole,
+        EnumerableInterface $newRole,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called after an attachment role is updated.
+     *
+     * Override this method to perform actions after a role update.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  Model  $attachment  The updated attachment model
+     * @param  EnumerableInterface  $oldRole  The old role
+     * @param  EnumerableInterface  $newRole  The new role
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function afterUpdateRole(
+        Model $other,
+        Model $attachment,
+        EnumerableInterface $oldRole,
+        EnumerableInterface $newRole,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called before metadata is updated.
+     *
+     * Override this method to perform actions before a metadata update.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  Model  $attachment  The attachment model being updated
+     * @param  StrictDataObject  $oldMetadata  The old metadata
+     * @param  StrictDataObject  $newMetadata  The new metadata
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function beforeUpdateMetadata(
+        Model $other,
+        Model $attachment,
+        StrictDataObject $oldMetadata,
+        StrictDataObject $newMetadata,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called after metadata is updated.
+     *
+     * Override this method to perform actions after a metadata update.
+     *
+     * @param  Model  $other  The other model in the attachment
+     * @param  Model  $attachment  The updated attachment model
+     * @param  StrictDataObject  $oldMetadata  The old metadata
+     * @param  StrictDataObject  $newMetadata  The new metadata
+     * @param  HookPosition  $position  The position of this model (rattachable or target)
+     */
+    public function afterUpdateMetadata(
+        Model $other,
+        Model $attachment,
+        StrictDataObject $oldMetadata,
+        StrictDataObject $newMetadata,
+        HookPosition $position
+    ): void {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called before detaching all attachments.
+     *
+     * Override this method to perform actions before detaching all attachments.
+     */
+    public function beforeDetachAll(): void
+    {
+        // Hook point - override as needed
+    }
+
+    /**
+     * Hook called after detaching all attachments.
+     *
+     * Override this method to perform actions after detaching all attachments.
+     */
+    public function afterDetachAll(): void
+    {
+        // Hook point - override as needed
     }
 }

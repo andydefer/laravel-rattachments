@@ -11,11 +11,11 @@ final class ConstraintModelSnippets
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class ConstrainedUser extends Model implements RattachmentConstraintsInterface
+final class ConstrainedUser extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -49,7 +49,7 @@ PHP;
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface as Constraints;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface as Constraints;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
@@ -69,11 +69,11 @@ PHP;
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-abstract class AbstractConstrainedModel extends Model implements RattachmentConstraintsInterface
+abstract class AbstractConstrainedModel extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -87,11 +87,11 @@ PHP;
 
 namespace App\Models;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class ConstrainedUser extends Model implements RattachmentConstraintsInterface
+final class ConstrainedUser extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -99,7 +99,7 @@ final class ConstrainedUser extends Model implements RattachmentConstraintsInter
     }
 }
 
-final class ConstrainedPost extends Model implements RattachmentConstraintsInterface
+final class ConstrainedPost extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -113,11 +113,11 @@ PHP;
 
 namespace App\Models\Users;
 
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
-final class ConstrainedUser extends Model implements RattachmentConstraintsInterface
+final class ConstrainedUser extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {

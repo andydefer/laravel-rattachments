@@ -1,28 +1,109 @@
 # Laravel Rattachments
 
-> Système de rattachement polymorphique double pour applications Laravel
+> Un système de rattachement polymorphique double pour applications Laravel
 
-Un package Laravel complet pour gérer des relations polymorphiques doubles entre n'importe quels modèles Eloquent, avec des rôles configurables, des métadonnées, un système de contraintes avancé et une validation centralisée.
+Un package Laravel complet pour gérer des relations polymorphiques doubles entre n'importe quels modèles Eloquent, avec des rôles contextuels, des métadonnées, un système de contraintes avancé et des hooks de cycle de vie.
 
 ---
 
 ## 📋 Table des matières
 
+- [Problématique et solution](#-problématique-et-solution)
 - [Fonctionnalités](#-fonctionnalités)
-- [Prérequis](#-prérequis)
 - [Installation](#-installation)
 - [Concept fondamental](#-concept-fondamental)
+- [Double polymorphisme](#-double-polymorphisme)
 - [Les contraintes](#-les-contraintes)
-- [Les rôles contextuels](#-les-rôles-contextuels)
+- [Rôles contextuels](#-rôles-contextuels)
+- [Résolution dynamique des rôles](#-résolution-dynamique-des-rôles)
+- [Système de hooks](#-système-de-hooks)
 - [Utilisation avec le service](#-utilisation-avec-le-service)
 - [Utilisation avec le trait](#-utilisation-avec-le-trait)
-- [Référence complète du service](#-référence-complète-du-service)
-- [Validation centralisée](#-validation-centralisée)
+- [Exemples concrets](#-exemples-concrets)
+- [Cas d'usage](#-cas-dusage)
 - [Inspection CLI](#-inspection-cli)
-- [Structure de la base de données](#-structure-de-la-base-de-données)
-- [Exemples complets](#-exemples-complets)
 - [Dépendances](#-dépendances)
 - [Licence](#-licence)
+
+---
+
+## 🎯 Problématique et solution
+
+### Le problème
+
+Dans les applications modernes, les relations entre entités sont rarement simples et unidirectionnelles. Les besoins courants incluent :
+
+- **Relations sociales** : Amitiés, abonnements, blocages
+- **Relations professionnelles** : Médecins dans des hôpitaux, employés dans des entreprises
+- **Relations de contenu** : Tags sur des articles, catégories sur des produits
+- **Relations contextuelles** : Rôles différents selon le contexte
+
+Les solutions traditionnelles (tables de liaison spécifiques) conduisent à :
+
+```php
+// ❌ Une table par type de relation
+// friendships table
+// follows table
+// blocks table
+// tags table
+// memberships table
+// invitations table
+// ...
+
+// ❌ Ou des relations complexes avec des packages lourds
+// Spatie\Permission, Laravel\Nova, etc.
+```
+
+**Le résultat :**
+- ✅ Multiples tables
+- ❌ Code répétitif
+- ❌ Relations complexes
+- ❌ Pas de polymorphisme
+- ❌ Pas de rôles contextuels
+- ❌ Pas de métadonnées
+
+---
+
+### La solution
+
+**Laravel Rattachments** propose une approche élégante : **une seule table polymorphique** pour gérer **tous les types de relations**.
+
+```php
+// ✅ Une table pour toutes les relations
+// Une seule table rattachments gère :
+// - Amitiés
+// - Abonnements
+// - Blocages
+// - Tags
+// - Adhésions
+// - Invitations
+// - Et tout ce que vous voulez !
+```
+
+**Le principe :**
+
+```php
+// Une relation est définie par :
+// - Qui attache (rattachable)
+// - Qui est attaché (target)
+// - Le rôle de la relation
+// - Des métadonnées optionnelles
+
+$user1->attachTo($user2, FriendRole::FRIEND);  // Une amitié
+$user1->attachTo($user2, BlockRole::BLOCKED);  // Un blocage
+$doctor->attachTo($hospital, HospitalRole::DOCTOR); // Une affiliation
+$post->attachTo($tag, TagRole::TAG); // Un tag
+```
+
+**Pourquoi c'est révolutionnaire ?**
+
+- ✅ **Une table** pour toutes les relations
+- ✅ **Polymorphique** : n'importe quel modèle avec n'importe quel autre
+- ✅ **Rôles contextuels** : chaque modèle définit ses propres rôles
+- ✅ **Contraintes avancées** : autorisation, unicité, interdiction
+- ✅ **Métadonnées** : stockez des données supplémentaires
+- ✅ **Hooks de cycle de vie** : intervenez avant/après chaque opération
+- ✅ **API fluide** : utilisez vos modèles comme des objets métier
 
 ---
 
@@ -34,6 +115,7 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - ✅ **Validation centralisée** - `ConstraintValidator` pour une validation cohérente
 - ✅ **Résolution dynamique des rôles** - Pas d'enum global, résolution basée sur le contexte
 - ✅ **Métadonnées flexibles** - Stockez des données supplémentaires au format JSON
+- ✅ **Hooks de cycle de vie** - `beforeAttach`, `afterAttach`, `beforeDetach`, `afterDetach`, etc.
 - ✅ **Trait HasRattachments** - API fluide directement dans vos modèles
 - ✅ **Filtrage avancé** - Par type, rôle, ou combinaison
 - ✅ **Opérations en masse** - Rattachement et détachement multiples
@@ -41,19 +123,14 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - ✅ **Pagination** - Récupérez les résultats paginés
 - ✅ **Inspection CLI** - Directive `rattachments:inspect` pour analyser les contraintes
 - ✅ **Découverte automatique** - Scan des modèles implémentant l'interface
-- ✅ **Rétrocompatibilité** - Support d'`UnknownRole` pour les rôles supprimés
+- ✅ **Contraintes uniques granulaires** - Un seul attachement par type ET rôle
+- ✅ **UnknownRole** - Rétrocompatibilité pour les rôles supprimés
+- ✅ **Typage strict** - Utilisation de `Model&RattachmentInterface` pour la sécurité des types
 - ✅ **Tests complets** - Couverture complète des tests d'intégration
 
 ---
 
-## 🚀 Prérequis
-
-- PHP 8.2 ou supérieur
-- Laravel 12.0, 13.0, 14.0 ou 15.0
-
----
-
-## 📦 Installation
+## 🚀 Installation
 
 ```bash
 composer require andydefer/laravel-rattachments
@@ -103,27 +180,53 @@ $attachment = $service->attach(
 
 ---
 
+## 🔄 Double polymorphisme
+
+### Qu'est-ce que le double polymorphisme ?
+
+Le package permet de rattacher **n'importe quel modèle** à **n'importe quel autre modèle**, dans les deux sens :
+
+```php
+// ✅ User → Hospital
+$user->attachTo($hospital, Role::DOCTOR);
+
+// ✅ Hospital → User
+$hospital->attachTo($user, Role::PATIENT);
+
+// ✅ User → User
+$user1->attachTo($user2, FriendRole::FRIEND);
+
+// ✅ Post → Tag
+$post->attachTo($tag, TagRole::TAG);
+
+// ✅ Doctor → Specialty
+$doctor->attachTo($specialty, SpecialtyRole::PRIMARY);
+```
+
+### Pourquoi c'est puissant ?
+
+| Approche traditionnelle | Laravel Rattachments |
+|------------------------|---------------------|
+| `User::friends()` | `$user->getTargetsByType(User::class)` |
+| `User::follows()` | `$user->getTargetsByType(User::class, FollowRole::FOLLOWER)` |
+| `User::blocks()` | `$user->getTargetsByType(User::class, BlockRole::BLOCKED)` |
+| `Post::tags()` | `$post->getTargetsByType(Tag::class)` |
+| `Doctor::hospitals()` | `$doctor->getTargetsByType(Hospital::class)` |
+
+**Une seule méthode, des résultats infinis !**
+
+---
+
 ## 🔒 Les contraintes
 
-L'interface `RattachmentConstraintsInterface` permet à vos modèles de définir trois types de contraintes.
+L'interface `RattachmentInterface` permet à vos modèles de définir trois types de contraintes.
 
 ### 1. Cibles autorisées (`allowedTargets`)
 
 Définit quels modèles peuvent être attachés et avec quels rôles.
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Models;
-
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use App\Enums\HospitalUserRole;
-use App\Enums\PharmacyUserRole;
-use Illuminate\Database\Eloquent\Model;
-
-final class User extends Model implements RattachmentConstraintsInterface
+final class User extends Model implements RattachmentInterface
 {
     public function allowedTargets(): array
     {
@@ -139,123 +242,82 @@ final class User extends Model implements RattachmentConstraintsInterface
             ],
         ];
     }
-
-    // Les autres méthodes obligatoires...
 }
 ```
 
-**Comportement :**
-```php
-// ✅ OK
-$service->attach($user, $hospital, HospitalUserRole::DOCTOR);
+### 2. Cibles uniques granulaires (`uniqueTargets`)
 
-// ❌ ERREUR - Rôle non autorisé
-$service->attach($user, $pharmacy, HospitalUserRole::DOCTOR);
-// "Role 'doctor' is not allowed for User -> Pharmacy. Allowed roles: pharmacist, staff"
-
-// ❌ ERREUR - Cible non autorisée
-$service->attach($user, $specialty, SpecialtyRole::SPECIALIST);
-// "User cannot be attached to Specialty. Allowed targets: Hospital, Pharmacy"
-```
-
----
-
-### 2. Cibles uniques (`uniqueTargets`)
-
-Limite un modèle à un seul rattachement par type de cible.
+Limite un modèle à un seul rattachement par type et/ou rôle.
 
 ```php
 public function uniqueTargets(): array
 {
     return [
-        Hospital::class,  // Un utilisateur ne peut être rattaché qu'à un seul hôpital
-        Pharmacy::class,  // Un utilisateur ne peut être rattaché qu'à une seule pharmacie
+        // Un seul Hospital (n'importe quel rôle)
+        Hospital::class => [],
+
+        // Un seul CHIEF par Hospital
+        Hospital::class => [Role::CHIEF],
+
+        // Un seul BEST_FRIEND
+        User::class => [FriendRole::BEST_FRIEND],
+
+        // Une seule PRIMARY specialty
+        Specialty::class => [Role::PRIMARY],
     ];
 }
 ```
 
-**Comportement :**
+**Exemple concret :**
+
 ```php
-// ✅ OK - Premier rattachement
-$service->attach($user, $hospital1, HospitalUserRole::DOCTOR);
+// ✅ OK - Premier CHIEF
+$doctor->attachTo($hospital1, Role::CHIEF);
 
-// ❌ ERREUR - Deuxième rattachement du même type
-$service->attach($user, $hospital2, HospitalUserRole::DOCTOR);
-// "User already has a unique attachment to Hospital. Only one Hospital is allowed."
+// ❌ ERREUR - Déjà CHIEF d'un hôpital
+$doctor->attachTo($hospital2, Role::CHIEF);
+// "Doctor already has a unique attachment to Hospital with role 'chief'"
 
-// ✅ OK - Type différent
-$service->attach($user, $pharmacy, PharmacyUserRole::PHARMACIST);
+// ✅ OK - Peut être DOCTOR dans plusieurs hôpitaux
+$doctor->attachTo($hospital2, Role::DOCTOR);
+$doctor->attachTo($hospital3, Role::DOCTOR);
 ```
-
----
 
 ### 3. Cibles interdites (`disallowedTargets`)
 
-Bloque des cibles ou des rôles spécifiques. Cette contrainte a **priorité maximale**.
+Bloque des cibles ou des rôles spécifiques (priorité maximale).
 
 ```php
 public function disallowedTargets(): array
 {
     return [
-        // Bloque TOUS les rattachements à Specialty
-        Specialty::class => [],
-
-        // Bloque uniquement le rôle REVIEWER pour Post
-        Post::class => [PostUserRole::REVIEWER],
-
-        // Bloque uniquement le rôle ADMIN pour Hospital
-        Hospital::class => [HospitalUserRole::ADMIN],
+        Specialty::class => [],  // Bloque TOUS les rattachements
+        Post::class => [PostUserRole::REVIEWER], // Bloque ce rôle
+        Hospital::class => [HospitalUserRole::ADMIN], // Bloque ADMIN
     ];
 }
 ```
 
-**Comportement :**
-```php
-// ❌ ERREUR - Cible complètement bloquée
-$service->attach($user, $specialty, SpecialtyRole::SPECIALIST);
-// "User cannot be attached to Specialty. This target is disallowed."
-
-// ❌ ERREUR - Rôle bloqué
-$service->attach($user, $post, PostUserRole::REVIEWER);
-// "Role 'reviewer' is disallowed for User -> Post. Disallowed roles: reviewer"
-
-// ✅ OK - Rôle autorisé
-$service->attach($user, $post, PostUserRole::AUTHOR);
-```
-
-> **⚠️ Règle de priorité :** `disallowedTargets` a priorité sur `allowedTargets`. Si une cible est dans les deux tableaux, `disallowedTargets` l'emporte.
-
 ---
 
-## 🏷️ Les rôles contextuels
+## 🏷️ Rôles contextuels
 
 ### Pourquoi des rôles contextuels ?
 
-Dans une application, le même terme ("admin") peut avoir des significations différentes selon le contexte :
+Dans une application, le même terme ("admin") peut avoir des significations différentes :
 
-- Un administrateur d'hôpital n'est pas la même chose qu'un administrateur de site
-- Un médecin peut avoir des rôles différents selon l'hôpital où il travaille
+- Un administrateur d'hôpital ≠ administrateur de site
+- Un médecin peut avoir des rôles différents selon l'hôpital
 
 Les rôles contextuels permettent de définir des enums spécifiques à chaque contexte.
 
-### Créer ses rôles
-
 ```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Enums;
-
-use AndyDefer\Repository\Contracts\EnumerableInterface;
-
-// Rôles pour un utilisateur attaché à un hôpital
-enum HospitalUserRole: string implements EnumerableInterface
+// Rôles pour un médecin dans un hôpital
+enum HospitalRole: string implements EnumerableInterface
 {
     case DOCTOR = 'doctor';
-    case NURSE = 'nurse';
-    case ADMIN = 'admin';
-    case STAFF = 'staff';
+    case CHIEF = 'chief';
+    case RESIDENT = 'resident';
 
     public function getValue(): string
     {
@@ -263,13 +325,12 @@ enum HospitalUserRole: string implements EnumerableInterface
     }
 }
 
-// Rôles pour un utilisateur attaché à un post
-enum PostUserRole: string implements EnumerableInterface
+// Rôles pour un utilisateur dans un réseau social
+enum FriendRole: string implements EnumerableInterface
 {
-    case AUTHOR = 'author';
-    case EDITOR = 'editor';
-    case REVIEWER = 'reviewer';
-    case CONTRIBUTOR = 'contributor';
+    case FRIEND = 'friend';
+    case BEST_FRIEND = 'best_friend';
+    case ACQUAINTANCE = 'acquaintance';
 
     public function getValue(): string
     {
@@ -278,30 +339,170 @@ enum PostUserRole: string implements EnumerableInterface
 }
 ```
 
-### Résolution dynamique
+---
+
+## 🔄 Résolution dynamique des rôles
+
+### Comment ça fonctionne ?
 
 Le package résout automatiquement le bon enum en fonction du contexte :
 
 ```php
 // En base de données
-[
+$attachment = [
     'rattachable_type' => 'App\Models\User',
     'target_type' => 'App\Models\Hospital',
     'role' => 'doctor',
-]
+];
 
 // Lecture - résolution automatique
 $attachment->role; // HospitalUserRole::DOCTOR
 
-// En base de données
-[
-    'rattachable_type' => 'App\Models\User',
-    'target_type' => 'App\Models\Post',
-    'role' => 'author',
-]
+// Autre contexte
+$attachment = [
+    'rattachable_type' => 'App\Models\Post',
+    'target_type' => 'App\Models\Tag',
+    'role' => 'primary',
+];
 
 // Lecture - résolution automatique
-$attachment->role; // PostUserRole::AUTHOR
+$attachment->role; // TagRole::PRIMARY
+```
+
+### Avantages
+
+- ✅ **Pas d'enum global** - Chaque modèle définit ses propres rôles
+- ✅ **Contextuel** - Le même nom a des significations différentes selon le contexte
+- ✅ **Rétrocompatible** - Les rôles supprimés retournent `UnknownRole`
+- ✅ **Performant** - Instanciation directe, pas de requête SQL
+
+### UnknownRole
+
+Si un rôle n'est plus autorisé par les contraintes actuelles, l'accesseur retourne une instance de `UnknownRole` :
+
+```php
+$role = $attachment->role;
+
+if ($role instanceof UnknownRole) {
+    Log::warning('Unknown role detected', [
+        'attachment_id' => $attachment->id,
+        'role_value' => $role->getValue(),
+    ]);
+}
+```
+
+---
+
+## 🔌 Système de hooks
+
+Le package expose un système de hooks permettant d'intervenir à chaque étape du cycle de vie d'un attachement.
+
+### Interface `AttachmentHookInterface`
+
+Tous les modèles implémentant `RattachmentInterface` héritent de `AttachmentHookInterface` et peuvent surcharger les méthodes suivantes :
+
+| Hook | Déclenchement |
+|------|---------------|
+| `beforeAttach()` | Avant la création d'un attachement |
+| `afterAttach()` | Après la création d'un attachement |
+| `beforeDetach()` | Avant la suppression d'un attachement |
+| `afterDetach()` | Après la suppression d'un attachement |
+| `beforeUpdateRole()` | Avant la mise à jour d'un rôle |
+| `afterUpdateRole()` | Après la mise à jour d'un rôle |
+| `beforeUpdateMetadata()` | Avant la mise à jour des métadonnées |
+| `afterUpdateMetadata()` | Après la mise à jour des métadonnées |
+| `beforeDetachAll()` | Avant la suppression de tous les attachements |
+| `afterDetachAll()` | Après la suppression de tous les attachements |
+
+### Position du modèle
+
+Chaque hook reçoit un paramètre `HookPosition` qui indique si le modèle est le **rattachable** (celui qui attache) ou le **target** (celui qui est attaché) :
+
+```php
+use AndyDefer\LaravelRattachments\Enums\HookPosition;
+
+enum HookPosition: string
+{
+    case RATTACHABLE = 'rattachable';
+    case TARGET = 'target';
+}
+```
+
+### Exemple d'implémentation
+
+```php
+class User extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+
+    public function beforeAttach(
+        Model $other,
+        EnumerableInterface $role,
+        array $metadata,
+        HookPosition $position
+    ): void {
+        Log::info('Before attach', [
+            'user_id' => $this->id,
+            'other_type' => get_class($other),
+            'other_id' => $other->getKey(),
+            'role' => $role->getValue(),
+            'position' => $position->value,
+        ]);
+
+        // Validation supplémentaire
+        if ($position === HookPosition::RATTACHABLE && $role->getValue() === 'admin') {
+            throw new \RuntimeException('Only administrators can attach with admin role');
+        }
+    }
+
+    public function afterAttach(
+        Model $other,
+        EnumerableInterface $role,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        AuditLog::create([
+            'user_id' => $this->id,
+            'action' => 'attach',
+            'target_type' => get_class($other),
+            'target_id' => $other->getKey(),
+            'role' => $role->getValue(),
+            'attachment_id' => $attachment->id,
+            'position' => $position->value,
+        ]);
+
+        // Invalider le cache
+        Cache::forget("user_{$this->id}_attachments");
+
+        // Envoyer une notification
+        if ($position === HookPosition::TARGET) {
+            $other->notify(new UserAttachedToYouNotification($this, $role));
+        }
+    }
+
+    public function beforeDetach(
+        Model $other,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        Log::info('Before detach', [
+            'user_id' => $this->id,
+            'attachment_id' => $attachment->id,
+        ]);
+    }
+
+    public function afterDetach(
+        Model $other,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        Cache::forget("user_{$this->id}_attachments");
+
+        if ($position === HookPosition::RATTACHABLE) {
+            $other->notify(new UserDetachedFromYouNotification($this));
+        }
+    }
+}
 ```
 
 ---
@@ -329,13 +530,12 @@ public function attachToHospital(Hospital $hospital)
     $doctor = auth()->user();
 
     $attachment = $this->rattachmentService->attach(
-        $doctor,                    // Modèle à rattacher
-        $hospital,                  // Modèle cible
-        HospitalUserRole::DOCTOR,   // Rôle (obligatoire)
-        [                           // Métadonnées (optionnel)
+        $doctor,
+        $hospital,
+        HospitalUserRole::DOCTOR,
+        [
             'consultation_days' => ['monday', 'wednesday', 'friday'],
             'consultation_hours' => '09:00-17:00',
-            'department' => 'Cardiology',
         ]
     );
 
@@ -538,262 +738,369 @@ Le trait `HasRattachments` offre une API fluide directement sur vos modèles.
 ### Ajouter le trait
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Models;
-
-use AndyDefer\LaravelRattachments\Traits\HasRattachments;
-use Illuminate\Database\Eloquent\Model;
-
-final class Doctor extends Model
+class Doctor extends Model implements RattachmentInterface
 {
     use HasRattachments;
 }
 ```
 
-### Créer et supprimer
+### API fluide
 
 ```php
 $doctor = Doctor::find(1);
 $hospital = Hospital::find(1);
 
 // Rattacher
-$doctor->attachTo($hospital, HospitalUserRole::DOCTOR, [
-    'consultation_days' => ['monday', 'wednesday'],
-]);
+$doctor->attachTo($hospital, HospitalRole::DOCTOR);
 
-// Détacher
-$doctor->detachFrom($hospital);
-$doctor->detachAll();
-```
-
-### Vérifier
-
-```php
-// Vérifier si attaché
+// Vérifier
 if ($doctor->isAttachedTo($hospital)) {
     // ...
 }
 
-// Vérifier si un rôle existe
-if ($doctor->hasRoleAttachedTo($hospital, HospitalUserRole::DOCTOR)) {
-    // ...
-}
+// Récupérer les hôpitaux
+$hospitals = $doctor->getTargetsByRole(HospitalRole::DOCTOR);
 
-// Récupérer un attachement spécifique
-$attachment = $doctor->getAttachment($hospital);
-```
+// Compter
+$count = $doctor->countTargetsByRole(HospitalRole::DOCTOR);
 
-### Lire les cibles
+// Détacher
+$doctor->detachFrom($hospital);
 
-```php
-// Toutes les cibles
-$hospitals = $doctor->getTargets();
-
-// Paginé
-$hospitals = $doctor->getTargetsPaginated(10, 2);
-
-// Par rôle
-$hospitals = $doctor->getTargetsByRole(HospitalUserRole::DOCTOR);
-
-// Par type
-$hospitals = $doctor->getTargetsByType(Hospital::class);
-
-// Par type et rôle
-$hospitals = $doctor->getTargetsByTypeAndRole(Hospital::class, HospitalUserRole::DOCTOR);
-
-// Par plusieurs types et rôles
-$targets = $doctor->getTargetsByTypesAndRoles(
-    [Hospital::class, Pharmacy::class],
-    [HospitalUserRole::DOCTOR, PharmacyUserRole::PHARMACIST]
-);
-```
-
-### Lire les rattachables
-
-```php
-// Tous les rattachables
-$users = $hospital->getRattachables();
-
-// Paginé
-$users = $hospital->getRattachablesPaginated(10, 2);
-
-// Par rôle
-$users = $hospital->getRattachablesByRole(HospitalUserRole::DOCTOR);
-```
-
-### Compter
-
-```php
-// Compter les cibles
-$count = $doctor->countTargets();
-$count = $doctor->countTargetsByRole(HospitalUserRole::DOCTOR);
-
-// Compter les rattachables
-$count = $hospital->countRattachables();
-$count = $hospital->countRattachablesByRole(HospitalUserRole::DOCTOR);
-```
-
-### Rôles distincts
-
-```php
-$roles = $doctor->getDistinctRoles();
-$roles = $hospital->getDistinctRolesForTarget();
-```
-
-### Mettre à jour
-
-```php
-$doctor->updateRoleFor($hospital, HospitalUserRole::ADMIN);
-$doctor->updateMetadataFor($hospital, ['hours' => '10:00-18:00']);
-$doctor->mergeMetadataFor($hospital, ['availability' => 'Monday-Friday']);
-```
-
-### Synchroniser
-
-```php
+// Synchroniser
 $doctor->syncAttachments([
-    ['target' => $hospital1, 'role' => HospitalUserRole::DOCTOR],
-    ['target' => $hospital2, 'role' => HospitalUserRole::DOCTOR],
+    ['target' => $hospital1, 'role' => HospitalRole::DOCTOR],
+    ['target' => $hospital2, 'role' => HospitalRole::CHIEF],
 ]);
 ```
 
----
-
-## 📚 Référence complète du service
-
-### Méthodes de création
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = []): Model` | Crée un rattachement | `Model` |
-| `attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = []): Collection` | Rattache plusieurs modèles à une cible | `Collection` |
-| `attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = []): Collection` | Rattache un modèle à plusieurs cibles | `Collection` |
-
-### Méthodes de suppression
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `detach(Model $rattachable, Model $target): void` | Supprime un rattachement | `void` |
-| `detachMultiple(Collection $rattachables, Model $target): void` | Supprime plusieurs rattachements | `void` |
-| `detachFromMultiple(Model $rattachable, Collection $targets): void` | Supprime les rattachements d'un modèle vers plusieurs cibles | `void` |
-| `detachAll(Model $model): void` | Supprime tous les rattachements d'un modèle | `void` |
-
-### Méthodes de vérification
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `isAttached(Model $rattachable, Model $target): bool` | Vérifie si un modèle est rattaché | `bool` |
-| `hasRoleAttached(Model $target, EnumerableInterface $role): bool` | Vérifie si un rôle existe pour une cible | `bool` |
-| `getAttachment(Model $rattachable, Model $target): ?Model` | Récupère un attachement spécifique | `?Model` |
-| `hasAttachmentsBetween(Model $rattachable, Model $target): bool` | Vérifie l'existence d'un attachement | `bool` |
-| `hasAttachmentsBetweenTypes(string $rattachableType, string $targetType): bool` | Vérifie l'existence de rattachements entre types | `bool` |
-| `getAttachmentsBetweenTypes(string $rattachableType, string $targetType): Collection` | Récupère les rattachements entre types | `Collection` |
-
-### Méthodes de lecture (cibles)
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `getTargets(Model $rattachable): Collection` | Toutes les cibles | `Collection` |
-| `getTargetsPaginated(Model $rattachable, int $perPage, int $page): LengthAwarePaginator` | Cibles paginées | `LengthAwarePaginator` |
-| `getTargetsByRole(Model $rattachable, EnumerableInterface $role): Collection` | Cibles par rôle | `Collection` |
-| `getTargetsByRolePaginated(Model $rattachable, EnumerableInterface $role, int $perPage, int $page): LengthAwarePaginator` | Cibles par rôle paginées | `LengthAwarePaginator` |
-| `getTargetsByType(Model $rattachable, string $targetClass): Collection` | Cibles par type | `Collection` |
-| `getTargetsByTypePaginated(Model $rattachable, string $targetClass, int $perPage, int $page): LengthAwarePaginator` | Cibles par type paginées | `LengthAwarePaginator` |
-| `getTargetsByTypeAndRole(Model $rattachable, string $targetClass, EnumerableInterface $role): Collection` | Cibles par type et rôle | `Collection` |
-| `getTargetsByTypeAndRoles(Model $rattachable, string $targetClass, array $roles): Collection` | Cibles par type et plusieurs rôles | `Collection` |
-| `getTargetsByTypesAndRoles(Model $rattachable, array $targetClasses, array $roles): Collection` | Cibles par plusieurs types et rôles | `Collection` |
-
-### Méthodes de lecture (rattachables)
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `getRattachables(Model $target): Collection` | Tous les modèles attachés | `Collection` |
-| `getRattachablesPaginated(Model $target, int $perPage, int $page): LengthAwarePaginator` | Modèles attachés paginés | `LengthAwarePaginator` |
-| `getRattachablesByRole(Model $target, EnumerableInterface $role): Collection` | Modèles attachés par rôle | `Collection` |
-| `getRattachablesByRolePaginated(Model $target, EnumerableInterface $role, int $perPage, int $page): LengthAwarePaginator` | Modèles attachés par rôle paginés | `LengthAwarePaginator` |
-
-### Méthodes de comptage
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `countTargets(Model $rattachable): int` | Nombre de cibles | `int` |
-| `countTargetsByRole(Model $rattachable, EnumerableInterface $role): int` | Nombre de cibles par rôle | `int` |
-| `countRattachables(Model $target): int` | Nombre de modèles attachés | `int` |
-| `countRattachablesByRole(Model $target, EnumerableInterface $role): int` | Nombre de modèles attachés par rôle | `int` |
-
-### Méthodes de mise à jour
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `updateRole(Model $rattachable, Model $target, EnumerableInterface $role): void` | Met à jour le rôle | `void` |
-| `updateRoleForMultiple(Collection $rattachables, Model $target, EnumerableInterface $role): void` | Met à jour le rôle de plusieurs rattachements | `void` |
-| `updateMetadata(Model $rattachable, Model $target, array $metadata): void` | Met à jour les métadonnées | `void` |
-| `mergeMetadata(Model $rattachable, Model $target, array $metadata): void` | Fusionne les métadonnées | `void` |
-| `deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType): int` | Supprime tous les rattachements entre types | `int` |
-
-### Méthodes de synchronisation
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `syncAttachments(Model $rattachable, array $targets): Collection` | Synchronise les rattachements | `Collection` |
-
-### Méthodes de rôles distincts
-
-| Méthode | Description | Retourne |
-|---------|-------------|----------|
-| `getDistinctRolesForRattachable(Model $rattachable): Collection` | Rôles distincts pour un modèle comme rattachable | `Collection` |
-| `getDistinctRolesForTarget(Model $target): Collection` | Rôles distincts pour un modèle comme cible | `Collection` |
-
----
-
-## 🛡️ Validation centralisée
-
-Le package utilise un `ConstraintValidator` centralisé pour toutes les validations.
-
-### Rôle du `ConstraintValidator`
-
-- Valide les contraintes de cibles autorisées
-- Valide les contraintes uniques
-- Valide les contraintes d'interdiction
-- Valide les rôles
-- Résout les rôles dynamiquement
-
-### Utilisation dans le service
+### Récupérer dans les deux sens
 
 ```php
-// Le service utilise automatiquement le validator
-$service->attach($user, $hospital, HospitalUserRole::DOCTOR);
-// La validation est effectuée avant la création
+$user = User::find(1);
+
+// Récupérer les cibles (ce que User a attaché)
+$hospitals = $user->getTargetsByType(Hospital::class);
+
+// Récupérer les rattachables (ce qui est attaché à User)
+$specialties = $user->getRattachablesByType(Specialty::class);
+
+// Vérifier les deux sens
+if ($user->isAttachedTo($hospital)) {
+    // User est attaché à Hospital
+}
+
+if ($hospital->isAttachedTo($user)) {
+    // Hospital est attaché à User
+}
 ```
 
-### Utilisation directe (avancé)
+### Compter les relations
 
 ```php
-use AndyDefer\LaravelRattachments\Validation\ConstraintValidator;
+// Compter les cibles
+$totalHospitals = $user->countTargets();
+$totalDoctors = $user->countTargetsByRole(HospitalRole::DOCTOR);
 
-$validator = app(ConstraintValidator::class);
-
-// Valider les contraintes
-$validator->validateConstraints($user, $hospital, HospitalUserRole::DOCTOR);
-
-// Valider les contraintes uniques
-$validator->validateUniqueConstraints($user, $hospital);
-
-// Valider un rôle
-$validator->validateRoleValue(User::class, Hospital::class, 'doctor');
-
-// Résoudre un rôle
-$role = $validator->resolveRole(User::class, Hospital::class, 'doctor');
+// Compter les rattachables
+$totalUsers = $hospital->countRattachables();
+$totalDoctors = $hospital->countRattachablesByRole(HospitalRole::DOCTOR);
 ```
+
+### Méthodes métier explicites
+
+Créez des méthodes métier pour une sémantique claire :
+
+```php
+class User extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+
+    // Amitié bidirectionnelle
+    public function becomeFriendWith(User $friend): void
+    {
+        $this->attachTo($friend, FriendRole::FRIEND);
+        $friend->attachTo($this, FriendRole::FRIEND);
+    }
+
+    public function unfriend(User $friend): void
+    {
+        $this->detachFrom($friend);
+        $friend->detachFrom($this);
+    }
+
+    public function getFriends(): Collection
+    {
+        return $this->getTargetsByTypeAndRole(User::class, FriendRole::FRIEND);
+    }
+
+    public function getBestFriends(): Collection
+    {
+        return $this->getTargetsByTypeAndRole(User::class, FriendRole::BEST_FRIEND);
+    }
+
+    // Suivi unidirectionnel
+    public function follow(User $user): void
+    {
+        $this->attachTo($user, FollowRole::FOLLOWER);
+    }
+
+    public function unfollow(User $user): void
+    {
+        $this->detachFrom($user);
+    }
+
+    public function isFollowing(User $user): bool
+    {
+        return $this->isAttachedTo($user);
+    }
+
+    public function getFollowers(): Collection
+    {
+        return $this->getRattachablesByRole(FollowRole::FOLLOWER);
+    }
+
+    public function getFollowing(): Collection
+    {
+        return $this->getTargetsByRole(FollowRole::FOLLOWER);
+    }
+
+    // Blocage
+    public function block(User $user): void
+    {
+        $this->attachTo($user, BlockRole::BLOCKED);
+    }
+
+    public function blockMutually(User $user): void
+    {
+        $this->attachTo($user, BlockRole::BLOCKED);
+        $user->attachTo($this, BlockRole::BLOCKED);
+    }
+
+    public function unblock(User $user): void
+    {
+        $this->detachFrom($user);
+    }
+
+    public function isBlocking(User $user): bool
+    {
+        return $this->isAttachedTo($user);
+    }
+
+    public function getBlockedUsers(): Collection
+    {
+        return $this->getTargetsByRole(BlockRole::BLOCKED);
+    }
+}
+```
+
+---
+
+## 💡 Exemples concrets
+
+### Exemple 1 : Réseau social - Amitiés
+
+```php
+class User extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+
+    public function becomeFriendWith(User $friend): void
+    {
+        $this->attachTo($friend, FriendRole::FRIEND);
+        $friend->attachTo($this, FriendRole::FRIEND);
+    }
+
+    public function unfriend(User $friend): void
+    {
+        $this->detachFrom($friend);
+        $friend->detachFrom($this);
+    }
+
+    public function getFriends(): Collection
+    {
+        return $this->getTargetsByTypeAndRole(User::class, FriendRole::FRIEND);
+    }
+
+    public function getBestFriends(): Collection
+    {
+        return $this->getTargetsByTypeAndRole(User::class, FriendRole::BEST_FRIEND);
+    }
+
+    public function isFriendWith(User $user): bool
+    {
+        return $this->isAttachedTo($user);
+    }
+}
+```
+
+### Exemple 2 : Réseau social - Abonnements
+
+```php
+class User extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+
+    public function follow(User $user): void
+    {
+        $this->attachTo($user, FollowRole::FOLLOWER);
+    }
+
+    public function unfollow(User $user): void
+    {
+        $this->detachFrom($user);
+    }
+
+    public function isFollowing(User $user): bool
+    {
+        return $this->isAttachedTo($user);
+    }
+
+    public function getFollowers(): Collection
+    {
+        return $this->getRattachablesByRole(FollowRole::FOLLOWER);
+    }
+
+    public function getFollowing(): Collection
+    {
+        return $this->getTargetsByRole(FollowRole::FOLLOWER);
+    }
+}
+```
+
+### Exemple 3 : Gestion de contenu - Tags
+
+```php
+class Post extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+
+    public function addTag(Tag $tag, TagRole $role): void
+    {
+        $this->attachTo($tag, $role, [
+            'added_at' => now()->toDateTimeString(),
+        ]);
+    }
+
+    public function removeTag(Tag $tag): void
+    {
+        $this->detachFrom($tag);
+    }
+
+    public function getTags(): Collection
+    {
+        return $this->getTargetsByType(Tag::class);
+    }
+
+    public function getPrimaryTags(): Collection
+    {
+        return $this->getTargetsByTypeAndRole(Tag::class, TagRole::PRIMARY);
+    }
+
+    public function syncTags(array $tags): Collection
+    {
+        return $this->syncAttachments($tags);
+    }
+}
+```
+
+### Exemple 4 : Relations professionnelles avec hooks
+
+```php
+class Doctor extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+
+    public function workAt(Hospital $hospital, HospitalRole $role): void
+    {
+        $this->attachTo($hospital, $role, [
+            'start_date' => now()->toDateString(),
+        ]);
+    }
+
+    public function leaveHospital(Hospital $hospital): void
+    {
+        $this->detachFrom($hospital);
+    }
+
+    public function promoteToChief(Hospital $hospital): void
+    {
+        $this->updateRoleFor($hospital, HospitalRole::CHIEF);
+    }
+
+    public function getHospitals(): Collection
+    {
+        return $this->getTargetsByType(Hospital::class);
+    }
+
+    public function beforeAttach(
+        Model $other,
+        EnumerableInterface $role,
+        array $metadata,
+        HookPosition $position
+    ): void {
+        Log::info('Doctor ' . $this->id . ' is being attached', [
+            'hospital_id' => $other->getKey(),
+            'role' => $role->getValue(),
+        ]);
+    }
+
+    public function afterAttach(
+        Model $other,
+        EnumerableInterface $role,
+        Model $attachment,
+        HookPosition $position
+    ): void {
+        // Envoyer une notification à l'hôpital
+        $other->notify(new DoctorJoinedNotification($this, $role));
+    }
+}
+```
+
+---
+
+## 🎯 Cas d'usage
+
+### Réseau social
+
+| Relation | Rattachable → Target | Rôle |
+|----------|---------------------|------|
+| Amitié | User → User | `FriendRole::FRIEND` |
+| Abonnement | User → User | `FollowRole::FOLLOWER` |
+| Blocage | User → User | `BlockRole::BLOCKED` |
+| Invitation | Group → User | `InviteRole::PENDING` |
+| Acceptation | User → Group | `InviteRole::ACCEPTED` |
+
+### Santé
+
+| Relation | Rattachable → Target | Rôle |
+|----------|---------------------|------|
+| Médecin → Hôpital | Doctor → Hospital | `HospitalRole::DOCTOR` |
+| Patient → Médecin | Patient → Doctor | `PatientRole::PATIENT` |
+| Spécialité → Médecin | Specialty → Doctor | `SpecialtyRole::PRIMARY` |
+| Ordonnance → Patient | Prescription → Patient | `PrescriptionRole::ACTIVE` |
+
+### Contenu
+
+| Relation | Rattachable → Target | Rôle |
+|----------|---------------------|------|
+| Article → Tag | Post → Tag | `TagRole::PRIMARY` |
+| Article → Catégorie | Post → Category | `CategoryRole::MAIN` |
+| Article → Auteur | Post → User | `AuthorRole::AUTHOR` |
+| Commentaire → Article | Comment → Post | `CommentRole::APPROVED` |
+
+### Entreprise
+
+| Relation | Rattachable → Target | Rôle |
+|----------|---------------------|------|
+| Employé → Entreprise | Employee → Company | `EmployeeRole::MANAGER` |
+| Employé → Projet | Employee → Project | `ProjectRole::LEAD` |
+| Projet → Client | Project → Client | `ClientRole::ACTIVE` |
+| Tâche → Employé | Task → Employee | `TaskRole::ASSIGNED` |
 
 ---
 
 ## 🔍 Inspection CLI
-
-La directive `rattachments:inspect` permet d'inspecter les contraintes et les connexions existantes.
 
 ### Commandes
 
@@ -832,9 +1139,9 @@ php artisan ri [App.Models.User] --constraints
 Hospital                                                     : doctor, staff, admin
 Pharmacy                                                     : pharmacist, staff
    🔒 Unique targets:
-Hospital                                                     : one-to-one
+Hospital                                                     : one-to-one (any role)
+Specialty                                                    : one-to-one (roles: primary)
    🚫 Disallowed targets:
-Specialty                                                    : 🚫 All roles disallowed
 Post                                                         : 🚫 Roles: reviewer
    ⚠️  CONFLICT DETECTED: The following targets appear in both allowed and disallowed:
 Post                                                         : ⚠️ Allowed: author, editor | Disallowed: reviewer → DISALLOW WINS
@@ -871,317 +1178,12 @@ User → Specialty                                               : ⚠️ Constr
 
 ---
 
-## 📝 Structure de la base de données
-
-```sql
-CREATE TABLE rattachments (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    rattachable_type VARCHAR(255) NOT NULL,
-    rattachable_id BIGINT UNSIGNED NOT NULL,
-    target_type VARCHAR(255) NOT NULL,
-    target_id BIGINT UNSIGNED NOT NULL,
-    role VARCHAR(255) NOT NULL,
-    metadata JSON NULL,
-    created_at TIMESTAMP NULL,
-    updated_at TIMESTAMP NULL,
-    
-    UNIQUE INDEX idx_unique_rattachment (rattachable_type, rattachable_id, target_type, target_id),
-    INDEX idx_rattachable (rattachable_type, rattachable_id),
-    INDEX idx_target (target_type, target_id),
-    INDEX idx_role (role)
-);
-```
-
-> **⚠️ IMPORTANT :** La colonne `role` est **NON NULLABLE**. Tous les rattachements doivent avoir un rôle.
-
----
-
-## 💡 Exemples complets
-
-### Exemple 1 : Gestion des médecins et hôpitaux
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Services;
-
-use AndyDefer\LaravelRattachments\Services\RattachmentService;
-use App\Enums\HospitalUserRole;
-use App\Models\Doctor;
-use App\Models\Hospital;
-use Illuminate\Support\Collection;
-
-final class HospitalManagementService
-{
-    public function __construct(
-        private readonly RattachmentService $rattachmentService,
-    ) {}
-
-    public function assignDoctor(Hospital $hospital, Doctor $doctor, array $schedule): void
-    {
-        $this->rattachmentService->attach(
-            $doctor,
-            $hospital,
-            HospitalUserRole::DOCTOR,
-            [
-                'schedule' => $schedule,
-                'assigned_at' => now()->toDateTimeString(),
-            ]
-        );
-    }
-
-    public function getHospitalDoctors(Hospital $hospital): Collection
-    {
-        return $this->rattachmentService->getRattachablesByRole($hospital, HospitalUserRole::DOCTOR);
-    }
-
-    public function getDoctorHospitals(Doctor $doctor): Collection
-    {
-        return $this->rattachmentService->getTargetsByRole($doctor, HospitalUserRole::DOCTOR);
-    }
-
-    public function promoteToChief(Doctor $doctor, Hospital $hospital): void
-    {
-        $this->rattachmentService->updateRole($doctor, $hospital, HospitalUserRole::ADMIN);
-    }
-
-    public function removeDoctor(Doctor $doctor, Hospital $hospital): void
-    {
-        $this->rattachmentService->detach($doctor, $hospital);
-    }
-
-    public function syncHospitalDoctors(Hospital $hospital, array $doctorData): Collection
-    {
-        $targets = [];
-        foreach ($doctorData as $data) {
-            $targets[] = [
-                'target' => $data['doctor'],
-                'role' => $data['role'] ?? HospitalUserRole::DOCTOR,
-                'metadata' => $data['metadata'] ?? [],
-            ];
-        }
-
-        return $this->rattachmentService->syncAttachments($hospital, $targets);
-    }
-}
-```
-
-### Exemple 2 : Gestion des tags d'un article
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Services;
-
-use AndyDefer\LaravelRattachments\Services\RattachmentService;
-use App\Enums\PostTagRole;
-use App\Models\Post;
-use App\Models\Tag;
-use Illuminate\Support\Collection;
-
-final class PostTagService
-{
-    public function __construct(
-        private readonly RattachmentService $rattachmentService,
-    ) {}
-
-    public function addTag(Post $post, Tag $tag, PostTagRole $role, array $metadata = []): void
-    {
-        $this->rattachmentService->attach($post, $tag, $role, $metadata);
-    }
-
-    public function removeTag(Post $post, Tag $tag): void
-    {
-        $this->rattachmentService->detach($post, $tag);
-    }
-
-    public function getPostTags(Post $post): Collection
-    {
-        return $this->rattachmentService->getTargetsByType($post, Tag::class);
-    }
-
-    public function getPostTagsByRole(Post $post, PostTagRole $role): Collection
-    {
-        return $this->rattachmentService->getTargetsByTypeAndRole($post, Tag::class, $role);
-    }
-
-    public function syncPostTags(Post $post, array $tagData): Collection
-    {
-        $targets = [];
-        foreach ($tagData as $data) {
-            $targets[] = [
-                'target' => $data['tag'],
-                'role' => $data['role'] ?? PostTagRole::TAG,
-                'metadata' => $data['metadata'] ?? [],
-            ];
-        }
-
-        return $this->rattachmentService->syncAttachments($post, $targets);
-    }
-
-    public function getTagCount(Post $post): int
-    {
-        return $this->rattachmentService->countTargets($post);
-    }
-
-    public function getPrimaryTags(Post $post): Collection
-    {
-        return $this->rattachmentService->getTargetsByTypeAndRole($post, Tag::class, PostTagRole::PRIMARY);
-    }
-}
-```
-
-### Exemple 3 : Pipeline de validation avec contraintes
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Models;
-
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use App\Enums\DocumentRole;
-use App\Enums\UserRole;
-use Illuminate\Database\Eloquent\Model;
-
-final class Document extends Model implements RattachmentConstraintsInterface
-{
-    public function allowedTargets(): array
-    {
-        return [
-            User::class => [
-                DocumentRole::AUTHOR,
-                DocumentRole::REVIEWER,
-                DocumentRole::APPROVER,
-                DocumentRole::EDITOR,
-            ],
-        ];
-    }
-
-    public function uniqueTargets(): array
-    {
-        return [
-            User::class, // Un document ne peut avoir qu'un seul auteur principal
-        ];
-    }
-
-    public function disallowedTargets(): array
-    {
-        return [
-            // Les utilisateurs avec le rôle "guest" ne peuvent pas être attachés
-            User::class => [UserRole::GUEST],
-        ];
-    }
-}
-```
-
-### Exemple 4 : Utilisation complète avec le trait
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Http\Controllers;
-
-use App\Models\Doctor;
-use App\Models\Hospital;
-use App\Enums\HospitalUserRole;
-use Illuminate\Http\JsonResponse;
-
-final class DoctorController extends Controller
-{
-    public function show(Doctor $doctor): JsonResponse
-    {
-        return response()->json([
-            'doctor' => $doctor,
-            'hospitals' => $doctor->getTargetsByRole(HospitalUserRole::DOCTOR),
-            'total_hospitals' => $doctor->countTargets(),
-            'roles' => $doctor->getDistinctRoles(),
-        ]);
-    }
-
-    public function attachToHospital(Doctor $doctor, Hospital $hospital): JsonResponse
-    {
-        if ($doctor->isAttachedTo($hospital)) {
-            return response()->json([
-                'message' => 'Doctor already attached to this hospital',
-            ], 422);
-        }
-
-        $attachment = $doctor->attachTo($hospital, HospitalUserRole::DOCTOR, [
-            'assigned_at' => now()->toDateTimeString(),
-        ]);
-
-        return response()->json([
-            'message' => 'Doctor attached successfully',
-            'attachment' => $attachment,
-        ]);
-    }
-
-    public function detachFromHospital(Doctor $doctor, Hospital $hospital): JsonResponse
-    {
-        if (!$doctor->isAttachedTo($hospital)) {
-            return response()->json([
-                'message' => 'Doctor is not attached to this hospital',
-            ], 422);
-        }
-
-        $doctor->detachFrom($hospital);
-
-        return response()->json([
-            'message' => 'Doctor detached successfully',
-        ]);
-    }
-
-    public function syncHospitals(Doctor $doctor, array $hospitalData): JsonResponse
-    {
-        $targets = [];
-        foreach ($hospitalData as $data) {
-            $targets[] = [
-                'target' => Hospital::find($data['hospital_id']),
-                'role' => HospitalUserRole::from($data['role']),
-                'metadata' => $data['metadata'] ?? [],
-            ];
-        }
-
-        $attachments = $doctor->syncAttachments($targets);
-
-        return response()->json([
-            'message' => 'Hospitals synchronized',
-            'attachments' => $attachments,
-        ]);
-    }
-
-    public function stats(Doctor $doctor): JsonResponse
-    {
-        return response()->json([
-            'total_hospitals' => $doctor->countTargets(),
-            'total_doctors' => $doctor->countRattachables(),
-            'hospitals_by_role' => [
-                'doctor' => $doctor->countTargetsByRole(HospitalUserRole::DOCTOR),
-                'admin' => $doctor->countTargetsByRole(HospitalUserRole::ADMIN),
-                'staff' => $doctor->countTargetsByRole(HospitalUserRole::STAFF),
-            ],
-            'distinct_roles' => $doctor->getDistinctRoles(),
-        ]);
-    }
-}
-```
-
----
-
 ## 📦 Dépendances
 
 - [`andydefer/domain-structures`](https://github.com/andydefer/domain-structures) - Structures de domaine (Value Objects, Records)
 - [`andydefer/laravel-repository`](https://github.com/andydefer/laravel-repository) - Pattern Repository
-- [`andydefer/laravel-directive`](https://github.com/andydefer/laravel-directive) - Framework CLI pour la directive d'inspection
-- [`andydefer/php-services`](https://github.com/andydefer/php-services) - Services PHP (FileSystem)
+- [`andydefer/laravel-directive`](https://github.com/andydefer/laravel-directive) - Framework CLI
+- [`andydefer/php-services`](https://github.com/andydefer/php-services) - Services PHP
 
 ---
 
