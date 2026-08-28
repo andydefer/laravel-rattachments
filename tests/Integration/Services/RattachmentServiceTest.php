@@ -6,20 +6,17 @@ namespace AndyDefer\LaravelRattachments\Tests\Integration\Services;
 
 use AndyDefer\DomainStructures\Utils\StrictDataObject;
 use AndyDefer\LaravelRattachments\Contracts\Services\RattachmentServiceInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
 use AndyDefer\LaravelRattachments\Models\Rattachment;
-use AndyDefer\LaravelRattachments\Repositories\RattachmentRepository;
-use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCheckPoint;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
-use AndyDefer\Repository\Configs\RepositoryConfig;
-use AndyDefer\Repository\Contracts\Configs\RepositoryConfigInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class RattachmentServiceTest extends IntegrationTestCase
@@ -34,23 +31,7 @@ final class RattachmentServiceTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        // ✅ Configurer les enum casts pour le repository
-        $this->app['config']->set('repository.enum_casts', [
-            'rattachments' => [
-                'role' => Role::class,
-            ],
-        ]);
-
-        // ✅ Rebinder RepositoryConfig
-        $this->app->singleton(RepositoryConfig::class, function ($app) {
-            return new RepositoryConfig($app['config']);
-        });
-
-        $this->app->bind(RepositoryConfigInterface::class, RepositoryConfig::class);
-
-        $this->service = new RattachmentService(
-            new RattachmentRepository
-        );
+        $this->service = app(RattachmentServiceInterface::class);
 
         $this->user = TestUser::create([
             'name' => 'John Doe',
@@ -67,7 +48,7 @@ final class RattachmentServiceTest extends IntegrationTestCase
     /**
      * Helper pour extraire le tableau du metadata.
      */
-    private function getMetadataArray($attachment): array
+    private function getMetadataArray(mixed $attachment): array
     {
         if ($attachment->metadata instanceof StrictDataObject) {
             return $attachment->metadata->toArray();
@@ -1376,5 +1357,37 @@ final class RattachmentServiceTest extends IntegrationTestCase
         // ✅ DOCTOR est autorisé pour TestUser
         $attachment = $this->service->attach($disallowedUser, $user2, Role::DOCTOR);
         $this->assertInstanceOf(Rattachment::class, $attachment);
+    }
+
+    public function test_no_n_plus_one_with_fixed_role_accessor(): void
+    {
+        // Arrange
+        $post = TestPost::create([
+            'user_id' => 1,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        for ($i = 0; $i < 10; $i++) {
+            $user = TestUser::create([
+                'name' => 'User '.$i,
+                'email' => 'user'.$i.'@example.com',
+            ]);
+
+            $this->service->attach($user, $post, Role::DOCTOR);
+        }
+
+        DB::enableQueryLog();
+
+        // Act
+        $attachments = Rattachment::all();
+        // 1 requête : SELECT * FROM rattachments
+
+        foreach ($attachments as $attachment) {
+            $role = $attachment->role; // ✅ 0 requête : instanciation directe
+        }
+
+        // Assert
+        $this->assertCount(1, DB::getQueryLog()); // ✅ Seulement la requête SELECT
     }
 }

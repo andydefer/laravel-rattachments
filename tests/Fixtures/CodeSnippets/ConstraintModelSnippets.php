@@ -12,7 +12,7 @@ final class ConstraintModelSnippets
 namespace App\Models;
 
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
 final class ConstrainedUser extends Model implements RattachmentConstraintsInterface
@@ -50,7 +50,7 @@ PHP;
 namespace App\Models;
 
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface as Constraints;
-use AndyDefer\LaravelRattachments\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
 final class ConstrainedUser extends Model implements Constraints
@@ -70,7 +70,7 @@ PHP;
 namespace App\Models;
 
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class AbstractConstrainedModel extends Model implements RattachmentConstraintsInterface
@@ -88,7 +88,7 @@ PHP;
 namespace App\Models;
 
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
 final class ConstrainedUser extends Model implements RattachmentConstraintsInterface
@@ -114,7 +114,7 @@ PHP;
 namespace App\Models\Users;
 
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
 final class ConstrainedUser extends Model implements RattachmentConstraintsInterface

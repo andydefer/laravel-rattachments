@@ -7,16 +7,14 @@ namespace AndyDefer\LaravelRattachments\Tests\Integration\Directives;
 use AndyDefer\Directive\Enums\ExitCode;
 use AndyDefer\Directive\Services\DirectiveTestingService;
 use AndyDefer\LaravelRattachments\Directives\RattachmentsInspectDirective;
-use AndyDefer\LaravelRattachments\Enums\Role;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCheckPoint;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
-use AndyDefer\Repository\Configs\RepositoryConfig;
-use AndyDefer\Repository\Contracts\Configs\RepositoryConfigInterface;
 use Illuminate\Support\Facades\Schema;
 
 final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
@@ -28,8 +26,6 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->configureEnumCasts();
 
         $this->service = new DirectiveTestingService(
             application: $this->app,
@@ -48,21 +44,6 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
     {
         $this->service->destroy();
         parent::tearDown();
-    }
-
-    private function configureEnumCasts(): void
-    {
-        $this->app['config']->set('repository.enum_casts', [
-            'rattachments' => [
-                'role' => Role::class,
-            ],
-        ]);
-
-        $this->app->singleton(RepositoryConfig::class, function ($app) {
-            return new RepositoryConfig($app['config']);
-        });
-
-        $this->app->bind(RepositoryConfigInterface::class, RepositoryConfig::class);
     }
 
     private function createTestData(): void
@@ -171,7 +152,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
     public function test_inspect_with_model_not_implementing_interface(): void
     {
         $response = $this->service->run(
-            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestUser] --constraints'
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestPlainUser] --constraints'
         );
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
@@ -337,7 +318,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
     public function test_inspect_handles_models_without_connections(): void
     {
         $response = $this->service->run(
-            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestPost] --connections'
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestPlainUser] --connections'
         );
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);

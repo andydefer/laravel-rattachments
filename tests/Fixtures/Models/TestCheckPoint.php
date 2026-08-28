@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelRattachments\Tests\Fixtures\Models;
 
+use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * This model represents a physical checkpoint (turnstile, gate, etc.)
  * that needs to authenticate with Nemesis tokens for ticket validation.
  */
-final class TestCheckPoint extends Model
+final class TestCheckPoint extends Model implements RattachmentConstraintsInterface
 {
     use SoftDeletes;
 
@@ -62,5 +63,20 @@ final class TestCheckPoint extends Model
     public function getOtpChannels(): array
     {
         return ['mail'];
+    }
+
+    public function allowedTargets(): array
+    {
+        return [];
+    }
+
+    public function uniqueTargets(): array
+    {
+        return [];
+    }
+
+    public function disallowedTargets(): array
+    {
+        return [];
     }
 }

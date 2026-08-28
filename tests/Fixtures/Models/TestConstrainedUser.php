@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelRattachments\Tests\Fixtures\Models;
 
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
-use AndyDefer\LaravelRattachments\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use Illuminate\Database\Eloquent\Model;
 
 final class TestConstrainedUser extends Model implements RattachmentConstraintsInterface

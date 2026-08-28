@@ -28,24 +28,19 @@ final class RattachmentRepository extends AbstractRepository implements Rattachm
             return;
         }
 
-        if ($filters->rattachable_type !== null) {
-            $query->where('rattachable_type', $filters->rattachable_type);
-        }
+        $query->when($filters->rattachable_type, fn ($q, $value) => $q->where('rattachable_type', $value)
+        );
 
-        if ($filters->rattachable_id !== null) {
-            $query->where('rattachable_id', $filters->rattachable_id);
-        }
+        $query->when($filters->rattachable_id, fn ($q, $value) => $q->where('rattachable_id', $value)
+        );
 
-        if ($filters->target_type !== null) {
-            $query->where('target_type', $filters->target_type);
-        }
+        $query->when($filters->target_type, fn ($q, $value) => $q->where('target_type', $value)
+        );
 
-        if ($filters->target_id !== null) {
-            $query->where('target_id', $filters->target_id);
-        }
+        $query->when($filters->target_id, fn ($q, $value) => $q->where('target_id', $value)
+        );
 
-        if ($filters->role !== null) {
-            $query->where('role', $filters->role);
-        }
+        $query->when($filters->role, fn ($q, $value) => $q->where('role', $value)
+        );
     }
 }

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelRattachments\Services;
 
 use AndyDefer\DomainStructures\Utils\StrictDataObject;
-use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
 use AndyDefer\LaravelRattachments\Contracts\Repositories\RattachmentRepositoryInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\RattachmentServiceInterface;
+use AndyDefer\LaravelRattachments\Contracts\Validation\ConstraintValidatorInterface;
 use AndyDefer\LaravelRattachments\Records\RattachmentFilterRecord;
 use AndyDefer\LaravelRattachments\Records\RattachmentRecord;
 use AndyDefer\Repository\Contracts\EnumerableInterface;
@@ -28,146 +28,22 @@ final class RattachmentService implements RattachmentServiceInterface
 {
     public function __construct(
         private readonly RattachmentRepositoryInterface $repository,
+        private readonly ConstraintValidatorInterface $constraintValidator,
     ) {}
 
-    /**
-     * Validates that the attachment respects the constraints defined by the rattachable model.
-     *
-     * Checks disallowed targets (with optional role restrictions), allowed targets, and allowed roles.
-     *
-     * @param  Model  $rattachable  The model being attached
-     * @param  Model  $target  The target model
-     * @param  EnumerableInterface|null  $role  The role (nullable)
-     *
-     * @throws RuntimeException If constraints are violated
+    /*
+     * ┌─────────────────────────────────────────────────────────────┐
+     * │                     PUBLIC METHODS                         │
+     * └─────────────────────────────────────────────────────────────┘
      */
-    private function validateConstraints(Model $rattachable, Model $target, ?EnumerableInterface $role): void
-    {
-        if (! $rattachable instanceof RattachmentConstraintsInterface) {
-            return;
-        }
-
-        $targetClass = $target->getMorphClass();
-
-        // ✅ Vérifier les disallowed targets avec rôle (priorité maximale)
-        $disallowed = method_exists($rattachable, 'disallowedTargets')
-            ? $rattachable->disallowedTargets()
-            : [];
-
-        if (array_key_exists($targetClass, $disallowed)) {
-            $disallowedRoles = $disallowed[$targetClass];
-
-            // Si le tableau est vide → tous les rôles sont bloqués
-            if (empty($disallowedRoles)) {
-                throw new RuntimeException(sprintf(
-                    '%s cannot be attached to %s. This target is disallowed.',
-                    $rattachable->getMorphClass(),
-                    $target->getMorphClass()
-                ));
-            }
-
-            // Si le rôle est spécifiquement bloqué
-            if ($role !== null && in_array($role, $disallowedRoles, true)) {
-                $disallowedValues = array_map(fn ($r) => $r->getValue(), $disallowedRoles);
-                throw new RuntimeException(sprintf(
-                    'Role "%s" is disallowed for %s -> %s. Disallowed roles: %s',
-                    $role->getValue(),
-                    $rattachable->getMorphClass(),
-                    $target->getMorphClass(),
-                    implode(', ', $disallowedValues)
-                ));
-            }
-        }
-
-        // ✅ Vérifier les allowed targets
-        $allowed = $rattachable->allowedTargets();
-
-        if (! isset($allowed[$targetClass])) {
-            $allowedTargets = array_keys($allowed);
-
-            throw new RuntimeException(sprintf(
-                '%s cannot be attached to %s. Allowed targets: %s',
-                $rattachable->getMorphClass(),
-                $target->getMorphClass(),
-                ! empty($allowedTargets) ? implode(', ', $allowedTargets) : 'none'
-            ));
-        }
-
-        if ($role === null) {
-            return;
-        }
-
-        // ✅ Vérifier les allowed roles
-        $allowedRoles = $allowed[$targetClass];
-        if (! in_array($role, $allowedRoles, true)) {
-            $allowedValues = array_map(fn ($r) => $r->getValue(), $allowedRoles);
-
-            throw new RuntimeException(sprintf(
-                'Role "%s" is not allowed for %s -> %s. Allowed roles: %s',
-                $role->getValue(),
-                $rattachable->getMorphClass(),
-                $target->getMorphClass(),
-                ! empty($allowedValues) ? implode(', ', $allowedValues) : 'none'
-            ));
-        }
-    }
-
-    /**
-     * Validates that the attachment does not violate unique target constraints.
-     *
-     * A model can only have ONE attachment per unique target type.
-     *
-     * @param  Model  $rattachable  The model being attached
-     * @param  Model  $target  The target model
-     *
-     * @throws RuntimeException If unique constraint is violated
-     */
-    private function validateUniqueConstraints(Model $rattachable, Model $target): void
-    {
-        if (! $rattachable instanceof RattachmentConstraintsInterface) {
-            return;
-        }
-
-        $uniqueTargets = method_exists($rattachable, 'uniqueTargets')
-            ? $rattachable->uniqueTargets()
-            : [];
-
-        $targetClass = $target->getMorphClass();
-
-        if (! in_array($targetClass, $uniqueTargets, true)) {
-            return;
-        }
-
-        $filter = RattachmentFilterRecord::from([
-            'rattachable_type' => $rattachable->getMorphClass(),
-            'rattachable_id' => $rattachable->getKey(),
-            'target_type' => $targetClass,
-        ]);
-
-        $findByRecord = new FindByRecord(
-            filters: $filter,
-            limit: 1,
-        );
-
-        $existing = $this->repository->findBy($findByRecord);
-
-        if ($existing->isNotEmpty()) {
-            throw new RuntimeException(sprintf(
-                '%s already has a unique attachment to %s. Only one %s is allowed.',
-                $rattachable->getMorphClass(),
-                $targetClass,
-                class_basename($targetClass)
-            ));
-        }
-    }
 
     /**
      * {@inheritDoc}
      */
-    public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model
+    public function attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = []): Model
     {
-        $this->validateConstraints($rattachable, $target, $role);
-        $this->validateUniqueConstraints($rattachable, $target);
+        $this->constraintValidator->validateConstraints($rattachable, $target, $role);
+        $this->constraintValidator->validateUniqueConstraints($rattachable, $target);
 
         if ($this->isAttached($rattachable, $target)) {
             throw new RuntimeException(sprintf(
@@ -184,7 +60,7 @@ final class RattachmentService implements RattachmentServiceInterface
             'rattachable_id' => $rattachable->getKey(),
             'target_type' => $target->getMorphClass(),
             'target_id' => $target->getKey(),
-            'role' => $role,
+            'role' => $role->getValue(),
             'metadata' => ! empty($metadata) ? $metadata : null,
         ]);
 
@@ -194,7 +70,7 @@ final class RattachmentService implements RattachmentServiceInterface
     /**
      * {@inheritDoc}
      */
-    public function attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection
+    public function attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = []): Collection
     {
         $results = new Collection;
 
@@ -208,7 +84,7 @@ final class RattachmentService implements RattachmentServiceInterface
     /**
      * {@inheritDoc}
      */
-    public function attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection
+    public function attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = []): Collection
     {
         $results = new Collection;
 
@@ -277,32 +153,6 @@ final class RattachmentService implements RattachmentServiceInterface
                 'target_id' => $model->getKey(),
             ])
         );
-    }
-
-    /**
-     * Finds an existing attachment between two models.
-     *
-     * @param  Model  $rattachable  The rattachable model
-     * @param  Model  $target  The target model
-     * @return Model|null The attachment model or null if not found
-     */
-    private function findExisting(Model $rattachable, Model $target): ?Model
-    {
-        $filter = RattachmentFilterRecord::from([
-            'rattachable_type' => $rattachable->getMorphClass(),
-            'rattachable_id' => $rattachable->getKey(),
-            'target_type' => $target->getMorphClass(),
-            'target_id' => $target->getKey(),
-        ]);
-
-        $findByRecord = new FindByRecord(
-            filters: $filter,
-            limit: 1,
-        );
-
-        $collection = $this->repository->findBy($findByRecord);
-
-        return $collection->first();
     }
 
     /**
@@ -613,7 +463,7 @@ final class RattachmentService implements RattachmentServiceInterface
      */
     public function updateRole(Model $rattachable, Model $target, EnumerableInterface $role): void
     {
-        $this->validateConstraints($rattachable, $target, $role);
+        $this->constraintValidator->validateConstraints($rattachable, $target, $role);
 
         $existing = $this->findExisting($rattachable, $target);
 
@@ -764,21 +614,23 @@ final class RattachmentService implements RattachmentServiceInterface
                 throw new RuntimeException('Each target must have "target" key');
             }
 
+            if (! isset($targetData['role'])) {
+                throw new RuntimeException('Each target must have "role" key');
+            }
+
             $target = $targetData['target'];
-            $role = $targetData['role'] ?? null;
+            $role = $targetData['role'];
             $metadata = $targetData['metadata'] ?? [];
 
-            $this->validateConstraints($rattachable, $target, $role);
-            $this->validateUniqueConstraints($rattachable, $target);
+            $this->constraintValidator->validateConstraints($rattachable, $target, $role);
+            $this->constraintValidator->validateUniqueConstraints($rattachable, $target);
 
             $newTargetIds[] = $target->getKey();
 
             $existing = $this->findExisting($rattachable, $target);
 
             if ($existing) {
-                if ($role !== null) {
-                    $this->updateRole($rattachable, $target, $role);
-                }
+                $this->updateRole($rattachable, $target, $role);
 
                 if (! empty($metadata)) {
                     $this->updateMetadata($rattachable, $target, $metadata);
@@ -866,5 +718,37 @@ final class RattachmentService implements RattachmentServiceInterface
                     && in_array($rattachment->role?->getValue(), $roleValues, true)
             )
             ->map(fn ($rattachment) => $rattachment->target);
+    }
+
+    /*
+     * ┌─────────────────────────────────────────────────────────────┐
+     * │                     PRIVATE METHODS                        │
+     * └─────────────────────────────────────────────────────────────┘
+     */
+
+    /**
+     * Finds an existing attachment between two models.
+     *
+     * @param  Model  $rattachable  The rattachable model
+     * @param  Model  $target  The target model
+     * @return Model|null The attachment model or null if not found
+     */
+    private function findExisting(Model $rattachable, Model $target): ?Model
+    {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+        ]);
+
+        $findByRecord = new FindByRecord(
+            filters: $filter,
+            limit: 1,
+        );
+
+        $collection = $this->repository->findBy($findByRecord);
+
+        return $collection->first();
     }
 }

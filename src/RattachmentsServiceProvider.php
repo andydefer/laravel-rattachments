@@ -7,9 +7,11 @@ namespace AndyDefer\LaravelRattachments;
 use AndyDefer\LaravelRattachments\Contracts\Repositories\RattachmentRepositoryInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\ConstraintDiscoveryServiceInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\RattachmentServiceInterface;
+use AndyDefer\LaravelRattachments\Contracts\Validation\ConstraintValidatorInterface;
 use AndyDefer\LaravelRattachments\Repositories\RattachmentRepository;
 use AndyDefer\LaravelRattachments\Services\ConstraintDiscoveryService;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Validation\ConstraintValidator;
 use AndyDefer\PhpServices\Contracts\FileSystemInterface;
 use AndyDefer\PhpServices\Services\FileSystemService;
 use Illuminate\Support\ServiceProvider;
@@ -20,6 +22,21 @@ final class RattachmentsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // ============================================================
+        // CONSTRAINT VALIDATOR
+        // ============================================================
+
+        $this->app->singleton(ConstraintValidator::class, function ($app) {
+            return new ConstraintValidator(
+                $app->make(RattachmentRepositoryInterface::class)
+            );
+        });
+
+        $this->app->bind(
+            ConstraintValidatorInterface::class,
+            ConstraintValidator::class
+        );
+
         // ============================================================
         // REPOSITORY
         // ============================================================
@@ -39,7 +56,8 @@ final class RattachmentsServiceProvider extends ServiceProvider
 
         $this->app->singleton(RattachmentService::class, function ($app) {
             return new RattachmentService(
-                $app->make(RattachmentRepositoryInterface::class)
+                $app->make(RattachmentRepositoryInterface::class),
+                $app->make(ConstraintValidatorInterface::class)
             );
         });
 

@@ -7,7 +7,7 @@ namespace AndyDefer\LaravelRattachments\Tests\Integration\Services\Visitors;
 use AndyDefer\LaravelRattachments\Services\Visitors\ConstraintModelVisitor;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\CodeSnippets\ConstraintModelSnippets;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
-use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
 use PhpParser\NodeTraverser;
 use PhpParser\Parser;
@@ -128,7 +128,7 @@ final class ConstraintModelVisitorTest extends IntegrationTestCase
 
     public function test_visitor_ignores_non_constrained_real_model(): void
     {
-        $path = __DIR__.'/../../../Fixtures/Models/TestUser.php';
+        $path = __DIR__.'/../../../Fixtures/Models/TestPlainUser.php';
         $content = file_get_contents($path);
 
         $ast = $this->parser->parse($content);
@@ -139,6 +139,6 @@ final class ConstraintModelVisitorTest extends IntegrationTestCase
         $traverser->traverse($ast);
         $models = $visitor->getModels();
 
-        $this->assertNotContains(TestUser::class, $models);
+        $this->assertNotContains(TestPlainUser::class, $models);
     }
 }

@@ -8,8 +8,8 @@ use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\ConstraintDiscoveryServiceInterface;
 use AndyDefer\LaravelRattachments\Services\ConstraintDiscoveryService;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
-use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
 use AndyDefer\PhpServices\Contracts\FileSystemInterface;
 use PhpParser\ParserFactory;
@@ -60,7 +60,7 @@ final class ConstraintDiscoveryServiceTest extends IntegrationTestCase
 
         $models = $this->discoveryService->discoverConstrainedModels([$source]);
 
-        $this->assertArrayNotHasKey(TestUser::class, $models);
+        $this->assertArrayNotHasKey(TestPlainUser::class, $models);
     }
 
     public function test_discover_constrained_models_from_multiple_sources(): void
@@ -84,7 +84,7 @@ final class ConstraintDiscoveryServiceTest extends IntegrationTestCase
 
         $models = $this->discoveryService->discoverConstrainedModels($sources);
 
-        $this->assertCount(2, $models);
+        $this->assertCount(5, $models);
         $this->assertArrayHasKey(TestConstrainedUser::class, $models);
     }
 

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->morphs('rattachable');
             $table->morphs('target');
 
-            $table->string('role')->nullable();
+            $table->string('role');
             $table->json('metadata')->nullable();
             $table->timestamps();
 

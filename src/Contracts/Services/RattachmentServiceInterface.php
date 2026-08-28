@@ -13,48 +13,48 @@ use Illuminate\Support\Collection;
  * Service interface for managing polymorphic attachments between Eloquent models.
  *
  * Provides a complete API for attaching, detaching, and querying relationships
- * between any two models with optional roles and metadata.
+ * between any two models with roles and metadata.
  */
 interface RattachmentServiceInterface
 {
     /**
-     * Attaches a model to another model with an optional role and metadata.
+     * Attaches a model to another model with a role and optional metadata.
      *
      * @param  Model  $rattachable  The model to attach (e.g., User, Doctor)
      * @param  Model  $target  The target model to attach to (e.g., Hospital, Pharmacy)
-     * @param  EnumerableInterface|null  $role  The role of the attachment (optional)
+     * @param  EnumerableInterface  $role  The role of the attachment (required)
      * @param  array<string, mixed>  $metadata  Additional metadata for the attachment
      * @return Model The created rattachment model
      *
      * @throws \RuntimeException If the attachment already exists or constraints are violated
      */
-    public function attach(Model $rattachable, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Model;
+    public function attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = []): Model;
 
     /**
-     * Attaches multiple models to a single target with an optional role and metadata.
+     * Attaches multiple models to a single target with a role and optional metadata.
      *
      * @param  Collection<int, Model>  $rattachables  Collection of models to attach
      * @param  Model  $target  The target model
-     * @param  EnumerableInterface|null  $role  The role for all attachments (optional)
+     * @param  EnumerableInterface  $role  The role for all attachments (required)
      * @param  array<string, mixed>  $metadata  Additional metadata for all attachments
      * @return Collection<int, Model> Collection of created rattachment models
      *
      * @throws \RuntimeException If any attachment already exists or constraints are violated
      */
-    public function attachMultiple(Collection $rattachables, Model $target, ?EnumerableInterface $role = null, array $metadata = []): Collection;
+    public function attachMultiple(Collection $rattachables, Model $target, EnumerableInterface $role, array $metadata = []): Collection;
 
     /**
-     * Attaches a single model to multiple targets with an optional role and metadata.
+     * Attaches a single model to multiple targets with a role and optional metadata.
      *
      * @param  Model  $rattachable  The model to attach
      * @param  Collection<int, Model>  $targets  Collection of target models
-     * @param  EnumerableInterface|null  $role  The role for all attachments (optional)
+     * @param  EnumerableInterface  $role  The role for all attachments (required)
      * @param  array<string, mixed>  $metadata  Additional metadata for all attachments
      * @return Collection<int, Model> Collection of created rattachment models
      *
      * @throws \RuntimeException If any attachment already exists or constraints are violated
      */
-    public function attachToMultiple(Model $rattachable, Collection $targets, ?EnumerableInterface $role = null, array $metadata = []): Collection;
+    public function attachToMultiple(Model $rattachable, Collection $targets, EnumerableInterface $role, array $metadata = []): Collection;
 
     /**
      * Detaches a model from another model.
@@ -372,14 +372,14 @@ interface RattachmentServiceInterface
     public function deleteAllAttachmentsBetweenTypes(string $rattachableType, string $targetType): int;
 
     /**
-     * Synchronizes attachments for a model with a given set of targets and optional roles.
+     * Synchronizes attachments for a model with a given set of targets and roles.
      *
      * Creates new attachments, updates existing ones, and removes attachments
      * that are no longer present in the target list.
      *
      * @param  Model  $rattachable  The attached model
-     * @param  array<array{target: Model, role?: EnumerableInterface, metadata?: array<string, mixed>}>  $targets
-     *                                                                                                             Array of targets with optional roles and metadata
+     * @param  array<array{target: Model, role: EnumerableInterface, metadata?: array<string, mixed>}>  $targets
+     *                                                                                                            Array of targets with roles and optional metadata
      * @return Collection<int, Model> Collection of created/updated attachment models
      *
      * @throws \RuntimeException If any target is invalid or constraints are violated

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AndyDefer\LaravelRattachments\Enums;
+namespace AndyDefer\LaravelRattachments\Tests\Fixtures\Enums;
 
 use AndyDefer\Repository\Contracts\EnumerableInterface;
 
