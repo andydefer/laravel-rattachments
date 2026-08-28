@@ -9,7 +9,9 @@ use AndyDefer\Directive\Services\DirectiveTestingService;
 use AndyDefer\LaravelRattachments\Directives\RattachmentsInspectDirective;
 use AndyDefer\LaravelRattachments\Enums\Role;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCheckPoint;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
@@ -39,6 +41,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
         $this->rattachmentService = $this->app->make(RattachmentService::class);
 
         $this->createTestData();
+        $this->createDisallowedTestData();
     }
 
     protected function tearDown(): void
@@ -82,6 +85,20 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
 
         $this->rattachmentService->attach($user, $post, Role::DOCTOR);
         $this->rattachmentService->attach($constrainedUser, $post, Role::DOCTOR);
+    }
+
+    private function createDisallowedTestData(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        TestCheckPoint::create([
+            'name' => 'Test Checkpoint',
+            'location' => 'Test Location',
+            'is_active' => true,
+        ]);
     }
 
     public function test_inspect_shows_constraints_for_specific_models(): void
@@ -173,7 +190,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
 
     public function test_inspect_with_no_models_discover_automatically(): void
     {
-        $response = $this->service->run('rattachments:inspect --constraints');
+        $response = $this->service->run('rattachments:inspect [] --constraints');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
         $this->assertStringContainsString('No models specified. Discovering models from sources...', $response->output);
@@ -197,7 +214,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
     public function test_inspect_with_multiple_sources(): void
     {
         $response = $this->service->run(
-            'rattachments:inspect [] [app.Models, tests.Fixtures.Models]  --constraints'
+            'rattachments:inspect [] [app.Models, tests.Fixtures.Models] --constraints'
         );
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
@@ -330,7 +347,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
     public function test_inspect_with_models_and_sources_prioritizes_models(): void
     {
         $response = $this->service->run(
-            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] --constraints [app.Models, tests.Fixtures.Models]'
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] [app.Models, tests.Fixtures.Models] --constraints'
         );
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
@@ -340,10 +357,138 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
 
     public function test_inspect_with_empty_sources_uses_default(): void
     {
-        $response = $this->service->run('rattachments:inspect --constraints []');
+        $response = $this->service->run('rattachments:inspect [] [] --constraints');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
         $this->assertStringContainsString('No models specified. Discovering models from sources...', $response->output);
         $this->assertStringContainsString('No sources specified. Using default: app.Models', $response->output);
+    }
+
+    // ============================================================
+    // DISALLOWED CONSTRAINTS TESTS
+    // ============================================================
+
+    public function test_inspect_shows_disallowed_targets(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestCheckPoint', $response->output);
+        $this->assertStringContainsString('All roles disallowed', $response->output);
+    }
+
+    public function test_inspect_shows_disallowed_and_allowed_targets_together(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('✅ Allowed targets', $response->output);
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringContainsString('TestUser', $response->output);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestCheckPoint', $response->output);
+        $this->assertStringContainsString('All roles disallowed', $response->output);
+    }
+
+    public function test_inspect_with_disallowed_models_shows_constraints(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('TestDisallowedUser', $response->output);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestCheckPoint', $response->output);
+        $this->assertStringContainsString('All roles disallowed', $response->output);
+    }
+
+    public function test_inspect_shows_disallowed_roles_granularly(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringContainsString('Roles: staff', $response->output);
+        $this->assertStringContainsString('TestUser', $response->output);
+        $this->assertStringContainsString('Roles: admin', $response->output);
+    }
+
+    public function test_inspect_shows_disallowed_targets_with_all_roles_blocked(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestCheckPoint', $response->output);
+        $this->assertStringContainsString('All roles disallowed', $response->output);
+    }
+
+    public function test_inspect_shows_conflict_when_target_in_both_allowed_and_disallowed(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('CONFLICT DETECTED', $response->output);
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringContainsString('DISALLOW WINS', $response->output);
+        $this->assertStringContainsString('TestUser', $response->output);
+        $this->assertStringContainsString('DISALLOW WINS', $response->output);
+    }
+
+    public function test_inspect_shows_override_in_allowed_section(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('✅ Allowed targets', $response->output);
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringContainsString('OVERRIDDEN BY DISALLOW', $response->output);
+        $this->assertStringContainsString('TestUser', $response->output);
+        $this->assertStringContainsString('OVERRIDDEN BY DISALLOW', $response->output);
+    }
+
+    public function test_inspect_shows_disallowed_for_models_with_empty_array(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestCheckPoint', $response->output);
+        $this->assertStringContainsString('All roles disallowed', $response->output);
+
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringContainsString('Roles: staff', $response->output);
+        $this->assertStringContainsString('TestUser', $response->output);
+        $this->assertStringContainsString('Roles: admin', $response->output);
+    }
+
+    public function test_inspect_with_multiple_disallowed_models(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestDisallowedUser, AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('TestDisallowedUser', $response->output);
+        $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
+        $this->assertStringContainsString('TestConstrainedUser', $response->output);
+        $this->assertStringContainsString('✅ Allowed targets', $response->output);
     }
 }

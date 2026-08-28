@@ -25,6 +25,11 @@ final class TestConstrainedUser extends Model implements RattachmentConstraintsI
         ];
     }
 
+    public function disallowedTargets(): array
+    {
+        return [];
+    }
+
     public function uniqueTargets(): array
     {
         return [

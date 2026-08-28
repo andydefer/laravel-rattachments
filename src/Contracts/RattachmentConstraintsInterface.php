@@ -38,4 +38,27 @@ interface RattachmentConstraintsInterface
      * ];
      */
     public function uniqueTargets(): array;
+
+    /**
+     * Define disallowed targets with optional role restrictions.
+     *
+     * - If a target class is listed with an empty array: ALL attachments to this target are blocked.
+     * - If a target class is listed with specific roles: only attachments with those roles are blocked.
+     * - This overrides allowedTargets().
+     *
+     * @return array<string, array<int, EnumerableInterface>> Array of FQCNs with optional role restrictions
+     *
+     * @example
+     * // Block all attachments to Specialty
+     * return [
+     *     Specialty::class => [],
+     * ];
+     *
+     * // Block only specific roles
+     * return [
+     *     User::class => [Role::STAFF],        // STAFF blocked, other roles allowed
+     *     Specialty::class => [Role::CONSULTANT], // CONSULTANT blocked
+     * ];
+     */
+    public function disallowedTargets(): array;
 }

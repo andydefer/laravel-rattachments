@@ -12,19 +12,20 @@ RattachmentServiceInterface
 ```
 
 **Dépendances :**
-- `RattachmentRepository` - Accès aux données
+- `RattachmentRepositoryInterface` - Accès aux données
 - `RattachmentConstraintsInterface` - Validation des contraintes (optionnelle)
 
 ## Rôle principal
 
 Le service orchestre toutes les opérations liées aux rattachements :
 - Création, mise à jour et suppression de rattachements
-- Validation des contraintes (`RattachmentConstraintsInterface`)
-- Validation des contraintes uniques (`uniqueTargets()`)
+- Validation des contraintes (`allowedTargets`, `disallowedTargets`, `uniqueTargets`)
 - Gestion des rôles (via `EnumerableInterface`, nullable)
 - Gestion des métadonnées (`StrictDataObject`)
 - Requêtes paginées et filtrées
 - Synchronisation en masse
+
+---
 
 ## API
 
@@ -653,6 +654,8 @@ $targets = $rattachmentService->getTargetsByTypesAndRoles(
 );
 ```
 
+---
+
 ## Gestion des erreurs
 
 | Situation | Exception | Message |
@@ -660,6 +663,8 @@ $targets = $rattachmentService->getTargetsByTypesAndRoles(
 | Rattachement déjà existant | `RuntimeException` | `{rattachable} {rattachable_id} is already attached to {target} {target_id}` |
 | Rattachement inexistant (detach) | `RuntimeException` | `{rattachable} {rattachable_id} is not attached to {target} {target_id}` |
 | Target non autorisé | `RuntimeException` | `{rattachable} cannot be attached to {target}. Allowed targets: {allowed_targets}` |
+| Target interdit | `RuntimeException` | `{rattachable} cannot be attached to {target}. This target is disallowed.` |
+| Conflit de contraintes | `RuntimeException` | `Constraint conflict in {rattachable}: The following targets are both allowed and disallowed: {conflicts}` |
 | Rôle non autorisé | `RuntimeException` | `Role "{role}" is not allowed for {rattachable} -> {target}. Allowed roles: {allowed_roles}` |
 | Contrainte unique violée | `RuntimeException` | `{rattachable} already has a unique attachment to {targetClass}. Only one {targetClass} is allowed.` |
 | Données `syncAttachments` invalides | `RuntimeException` | `Each target must have "target" key` |

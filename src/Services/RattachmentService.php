@@ -6,10 +6,10 @@ namespace AndyDefer\LaravelRattachments\Services;
 
 use AndyDefer\DomainStructures\Utils\StrictDataObject;
 use AndyDefer\LaravelRattachments\Contracts\RattachmentConstraintsInterface;
+use AndyDefer\LaravelRattachments\Contracts\Repositories\RattachmentRepositoryInterface;
 use AndyDefer\LaravelRattachments\Contracts\Services\RattachmentServiceInterface;
 use AndyDefer\LaravelRattachments\Records\RattachmentFilterRecord;
 use AndyDefer\LaravelRattachments\Records\RattachmentRecord;
-use AndyDefer\LaravelRattachments\Repositories\RattachmentRepository;
 use AndyDefer\Repository\Contracts\EnumerableInterface;
 use AndyDefer\Repository\Records\FindByRecord;
 use AndyDefer\Repository\Records\PaginateRecord;
@@ -27,13 +27,13 @@ use RuntimeException;
 final class RattachmentService implements RattachmentServiceInterface
 {
     public function __construct(
-        private readonly RattachmentRepository $repository,
+        private readonly RattachmentRepositoryInterface $repository,
     ) {}
 
     /**
      * Validates that the attachment respects the constraints defined by the rattachable model.
      *
-     * Checks both allowed targets and allowed roles.
+     * Checks disallowed targets (with optional role restrictions), allowed targets, and allowed roles.
      *
      * @param  Model  $rattachable  The model being attached
      * @param  Model  $target  The target model
@@ -47,8 +47,40 @@ final class RattachmentService implements RattachmentServiceInterface
             return;
         }
 
-        $allowed = $rattachable->allowedTargets();
         $targetClass = $target->getMorphClass();
+
+        // ✅ Vérifier les disallowed targets avec rôle (priorité maximale)
+        $disallowed = method_exists($rattachable, 'disallowedTargets')
+            ? $rattachable->disallowedTargets()
+            : [];
+
+        if (array_key_exists($targetClass, $disallowed)) {
+            $disallowedRoles = $disallowed[$targetClass];
+
+            // Si le tableau est vide → tous les rôles sont bloqués
+            if (empty($disallowedRoles)) {
+                throw new RuntimeException(sprintf(
+                    '%s cannot be attached to %s. This target is disallowed.',
+                    $rattachable->getMorphClass(),
+                    $target->getMorphClass()
+                ));
+            }
+
+            // Si le rôle est spécifiquement bloqué
+            if ($role !== null && in_array($role, $disallowedRoles, true)) {
+                $disallowedValues = array_map(fn ($r) => $r->getValue(), $disallowedRoles);
+                throw new RuntimeException(sprintf(
+                    'Role "%s" is disallowed for %s -> %s. Disallowed roles: %s',
+                    $role->getValue(),
+                    $rattachable->getMorphClass(),
+                    $target->getMorphClass(),
+                    implode(', ', $disallowedValues)
+                ));
+            }
+        }
+
+        // ✅ Vérifier les allowed targets
+        $allowed = $rattachable->allowedTargets();
 
         if (! isset($allowed[$targetClass])) {
             $allowedTargets = array_keys($allowed);
@@ -65,6 +97,7 @@ final class RattachmentService implements RattachmentServiceInterface
             return;
         }
 
+        // ✅ Vérifier les allowed roles
         $allowedRoles = $allowed[$targetClass];
         if (! in_array($role, $allowedRoles, true)) {
             $allowedValues = array_map(fn ($r) => $r->getValue(), $allowedRoles);
@@ -95,7 +128,10 @@ final class RattachmentService implements RattachmentServiceInterface
             return;
         }
 
-        $uniqueTargets = $rattachable->uniqueTargets();
+        $uniqueTargets = method_exists($rattachable, 'uniqueTargets')
+            ? $rattachable->uniqueTargets()
+            : [];
+
         $targetClass = $target->getMorphClass();
 
         if (! in_array($targetClass, $uniqueTargets, true)) {

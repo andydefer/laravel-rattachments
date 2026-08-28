@@ -12,6 +12,7 @@ use AndyDefer\LaravelRattachments\Repositories\RattachmentRepository;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCheckPoint;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
@@ -1157,5 +1158,223 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
         $this->assertInstanceOf(Rattachment::class, $attachment);
         $this->assertEquals(Role::ADMIN, $attachment->role);
+    }
+
+    // ============================================================
+    // DISALLOWED CONSTRAINTS TESTS
+    // ============================================================
+
+    public function test_attach_with_disallowed_target_throws_exception(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $checkpoint = TestCheckPoint::create([
+            'name' => 'Test Checkpoint',
+            'location' => 'Test Location',
+            'is_active' => true,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('cannot be attached to');
+
+        $this->service->attach($disallowedUser, $checkpoint, Role::DOCTOR);
+    }
+
+    public function test_attach_with_allowed_target_works_even_with_disallowed_defined(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $attachment = $this->service->attach(
+            $disallowedUser,
+            $post,
+            Role::DOCTOR
+        );
+
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+        $this->assertEquals(Role::DOCTOR, $attachment->role);
+    }
+
+    public function test_disallowed_target_override_allowed_target(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $checkpoint = TestCheckPoint::create([
+            'name' => 'Test Checkpoint',
+            'location' => 'Test Location',
+            'is_active' => true,
+        ]);
+
+        // ✅ Attacher à Post (autorisé) → OK
+        $attachment = $this->service->attach($disallowedUser, $post, Role::DOCTOR);
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+
+        // ❌ Attacher à Checkpoint (disallowed) → Exception
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('cannot be attached to');
+
+        $this->service->attach($disallowedUser, $checkpoint, Role::STAFF);
+    }
+
+    public function test_disallowed_target_is_respected_in_sync_attachments(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $checkpoint = TestCheckPoint::create([
+            'name' => 'Test Checkpoint',
+            'location' => 'Test Location',
+            'is_active' => true,
+        ]);
+
+        // ✅ Premier rattachement autorisé
+        $this->service->attach($disallowedUser, $post, Role::DOCTOR);
+
+        // ❌ Sync avec Checkpoint (disallowed) → Exception
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('cannot be attached to');
+
+        $this->service->syncAttachments($disallowedUser, [
+            [
+                'target' => $post,
+                'role' => Role::DOCTOR,
+            ],
+            [
+                'target' => $checkpoint,
+                'role' => Role::STAFF,
+            ],
+        ]);
+    }
+
+    public function test_attach_with_disallowed_role_on_allowed_target_throws_exception(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        // ❌ STAFF est disallowed pour TestPost
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Role "staff" is disallowed for');
+
+        $this->service->attach($disallowedUser, $post, Role::STAFF);
+    }
+
+    public function test_attach_with_allowed_role_on_allowed_target_works(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $post = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Test Post',
+            'body' => 'Test content',
+        ]);
+
+        $post2 = TestPost::create([
+            'user_id' => $this->user->id,
+            'title' => 'Second Post',
+            'body' => 'Test content',
+        ]);
+
+        // ✅ DOCTOR est autorisé pour TestPost
+        $attachment = $this->service->attach($disallowedUser, $post, Role::DOCTOR);
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+
+        // ✅ ADMIN est autorisé pour TestPost (post différent)
+        $attachment2 = $this->service->attach($disallowedUser, $post2, Role::ADMIN);
+        $this->assertInstanceOf(Rattachment::class, $attachment2);
+    }
+
+    public function test_attach_with_disallowed_role_on_disallowed_target_throws_disallowed_target_exception_first(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $checkpoint = TestCheckPoint::create([
+            'name' => 'Test Checkpoint',
+            'location' => 'Test Location',
+            'is_active' => true,
+        ]);
+
+        // ❌ Checkpoint est totalement disallowed ([]), priorité sur le rôle
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('cannot be attached to');
+
+        $this->service->attach($disallowedUser, $checkpoint, Role::STAFF);
+    }
+
+    public function test_disallowed_role_on_user_target_throws_exception(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        // ❌ ADMIN est disallowed pour TestUser
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Role "admin" is disallowed for');
+
+        $this->service->attach($disallowedUser, $user2, Role::ADMIN);
+    }
+
+    public function test_attach_with_allowed_role_on_user_target_works(): void
+    {
+        $disallowedUser = TestDisallowedUser::create([
+            'name' => 'Disallowed User',
+            'email' => 'disallowed@example.com',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        // ✅ DOCTOR est autorisé pour TestUser
+        $attachment = $this->service->attach($disallowedUser, $user2, Role::DOCTOR);
+        $this->assertInstanceOf(Rattachment::class, $attachment);
     }
 }

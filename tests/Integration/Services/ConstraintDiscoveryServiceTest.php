@@ -84,7 +84,7 @@ final class ConstraintDiscoveryServiceTest extends IntegrationTestCase
 
         $models = $this->discoveryService->discoverConstrainedModels($sources);
 
-        $this->assertCount(1, $models);
+        $this->assertCount(2, $models);
         $this->assertArrayHasKey(TestConstrainedUser::class, $models);
     }
 

@@ -107,11 +107,17 @@ final class RattachmentsInspectDirective extends AbstractDirective
                     $uniqueTargets = method_exists($instance, 'uniqueTargets')
                         ? $instance->uniqueTargets()
                         : [];
+
+                    // ✅ Récupérer les disallowedTargets si la méthode existe
+                    $disallowedTargets = method_exists($instance, 'disallowedTargets')
+                        ? $instance->disallowedTargets()
+                        : [];
                 }
 
                 $result[$modelClass] = [
                     'allowedTargets' => $allowedTargets,
                     'uniqueTargets' => $uniqueTargets,
+                    'disallowedTargets' => $disallowedTargets ?? [],
                     'implementsInterface' => $implementsInterface,
                 ];
             } catch (\Exception $e) {
@@ -153,6 +159,12 @@ final class RattachmentsInspectDirective extends AbstractDirective
             }
 
             $allowed = $data['allowedTargets'] ?? [];
+            $disallowed = $data['disallowedTargets'] ?? [];
+
+            // ✅ Vérifier les conflits entre allowed et disallowed
+            $conflicts = array_intersect(array_keys($allowed), array_keys($disallowed));
+
+            // ✅ Allowed Targets
             $this->line('   ✅ Allowed targets:');
 
             if (empty($allowed)) {
@@ -160,16 +172,34 @@ final class RattachmentsInspectDirective extends AbstractDirective
             } else {
                 $allowedData = MapCollection::from([]);
                 foreach ($allowed as $target => $roles) {
-                    // ✅ Afficher le FQCN complet, pas seulement le nom court
+                    $shortTarget = basename(str_replace('\\', '/', $target));
                     $rolesLabel = array_map(
                         fn ($role) => $role instanceof \BackedEnum ? $role->value : (string) $role,
                         $roles
                     );
-                    $allowedData = $allowedData->put($target, implode(', ', $rolesLabel));
+
+                    // ✅ Vérifier si ce target est aussi dans disallowed
+                    if (in_array($target, $conflicts, true)) {
+                        $disallowedRoles = $disallowed[$target] ?? [];
+
+                        // ✅ Si disallowed est un tableau vide → tout est bloqué
+                        if (empty($disallowedRoles)) {
+                            $rolesLabel[] = '⚠️ OVERRIDDEN BY DISALLOW (all roles blocked)';
+                        } else {
+                            $disallowedLabels = array_map(
+                                fn ($role) => $role instanceof \BackedEnum ? $role->value : (string) $role,
+                                $disallowedRoles
+                            );
+                            $rolesLabel[] = '⚠️ OVERRIDDEN BY DISALLOW ('.implode(', ', $disallowedLabels).')';
+                        }
+                    }
+
+                    $allowedData = $allowedData->put($shortTarget, implode(', ', $rolesLabel));
                 }
                 $this->getConsole()->raw(KeyValue::renderWithValueColor($allowedData, 'green'));
             }
 
+            // ✅ Unique Targets
             $unique = $data['uniqueTargets'] ?? [];
             $this->line('   🔒 Unique targets:');
             if (empty($unique)) {
@@ -177,10 +207,65 @@ final class RattachmentsInspectDirective extends AbstractDirective
             } else {
                 $uniqueData = MapCollection::from([]);
                 foreach ($unique as $target) {
-                    // ✅ Afficher le FQCN complet
-                    $uniqueData = $uniqueData->put($target, 'one-to-one');
+                    $shortTarget = basename(str_replace('\\', '/', $target));
+                    $uniqueData = $uniqueData->put($shortTarget, 'one-to-one');
                 }
                 $this->getConsole()->raw(KeyValue::renderWithValueColor($uniqueData, 'yellow'));
+            }
+
+            // ✅ Disallowed Targets (granulaire)
+            $this->line('   🚫 Disallowed targets:');
+            if (empty($disallowed)) {
+                $this->line('      (none)');
+            } else {
+                $disallowedData = MapCollection::from([]);
+                foreach ($disallowed as $target => $roles) {
+                    $shortTarget = basename(str_replace('\\', '/', $target));
+
+                    // ✅ Si le tableau est vide → tous les rôles sont bloqués
+                    if (empty($roles)) {
+                        $disallowedData = $disallowedData->put($shortTarget, '🚫 All roles disallowed');
+                    } else {
+                        // ✅ Sinon, afficher les rôles spécifiquement bloqués
+                        $rolesLabel = array_map(
+                            fn ($role) => $role instanceof \BackedEnum ? $role->value : (string) $role,
+                            $roles
+                        );
+                        $disallowedData = $disallowedData->put($shortTarget, '🚫 Roles: '.implode(', ', $rolesLabel));
+                    }
+                }
+                $this->getConsole()->raw(KeyValue::renderWithValueColor($disallowedData, 'red'));
+            }
+
+            // ✅ Afficher un résumé des conflits si présents
+            if (! empty($conflicts)) {
+                $this->newLine();
+                $this->line('   ⚠️  CONFLICT DETECTED: The following targets appear in both allowed and disallowed:');
+                $conflictData = MapCollection::from([]);
+                foreach ($conflicts as $target) {
+                    $shortTarget = basename(str_replace('\\', '/', $target));
+                    $disallowedRoles = $disallowed[$target] ?? [];
+                    $allowedRoles = $allowed[$target] ?? [];
+
+                    $allowedLabels = array_map(
+                        fn ($role) => $role instanceof \BackedEnum ? $role->value : (string) $role,
+                        $allowedRoles
+                    );
+
+                    if (empty($disallowedRoles)) {
+                        $conflictData = $conflictData->put($shortTarget, '⚠️ All roles allowed but completely disallowed → DISALLOW WINS');
+                    } else {
+                        $disallowedLabels = array_map(
+                            fn ($role) => $role instanceof \BackedEnum ? $role->value : (string) $role,
+                            $disallowedRoles
+                        );
+                        $conflictData = $conflictData->put(
+                            $shortTarget,
+                            '⚠️ Allowed: '.implode(', ', $allowedLabels).' | Disallowed: '.implode(', ', $disallowedLabels).' → DISALLOW WINS'
+                        );
+                    }
+                }
+                $this->getConsole()->raw(KeyValue::renderWithValueColor($conflictData, 'magenta'));
             }
 
             $this->newLine();
@@ -201,7 +286,6 @@ final class RattachmentsInspectDirective extends AbstractDirective
             return;
         }
 
-        // ✅ Filtrer uniquement les modèles qui implémentent l'interface
         $modelClasses = array_keys(array_filter($constrainedModels, function ($data) {
             return $data['implementsInterface'] ?? true;
         }));
@@ -285,7 +369,6 @@ final class RattachmentsInspectDirective extends AbstractDirective
         $missingData = MapCollection::from([]);
 
         foreach ($constrainedModels as $modelClass => $data) {
-            // ✅ Vérifier si la clé existe
             $implementsInterface = $data['implementsInterface'] ?? true;
             if (! $implementsInterface) {
                 continue;
