@@ -26,15 +26,32 @@ interface RattachmentConstraintsInterface
     public function allowedTargets(): array;
 
     /**
-     * Define unique targets for this model.
-     * A model can only have ONE attachment to each target type listed here.
+     * Define unique targets with optional role restrictions.
      *
-     * @return array<int, string> Array of FQCNs
+     * - If a target class is listed with an empty array: ONE attachment per type (any role)
+     * - If a target class is listed with specific roles: ONE attachment per type AND role
+     *
+     * @return array<string, array<int, EnumerableInterface>> Array of FQCNs with optional role restrictions
      *
      * @example
+     * // Only one DoctorProfile per User (any role)
      * return [
-     *     User::class,  // A Hospital can have only ONE User (director)
-     *     Pharmacy::class, // A Hospital can have only ONE Pharmacy (main supplier)
+     *     DoctorProfile::class => [],
+     * ];
+     *
+     * // A doctor can have many Hospital::DOCTOR, but only one Hospital::CHIEF
+     * return [
+     *     Hospital::class => [Role::CHIEF],
+     * ];
+     *
+     * // A doctor can have many Specialty::SPECIALIST, but only one Specialty::PRIMARY
+     * return [
+     *     Specialty::class => [Role::PRIMARY],
+     * ];
+     *
+     * // A User can have many Friend::FRIEND, but only one Friend::BEST_FRIEND
+     * return [
+     *     User::class => [FriendRole::BEST_FRIEND],
      * ];
      */
     public function uniqueTargets(): array;

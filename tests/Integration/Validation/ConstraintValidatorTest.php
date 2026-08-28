@@ -9,8 +9,11 @@ use AndyDefer\LaravelRattachments\Services\RattachmentService;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestHospital;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestSpecializedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestSpecialty;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
 use AndyDefer\LaravelRattachments\Validation\ConstraintValidator;
@@ -97,7 +100,6 @@ final class ConstraintValidatorTest extends IntegrationTestCase
 
     public function test_validate_constraints_throws_exception_when_target_not_allowed(): void
     {
-        // TestPost has empty allowedTargets → ne permet aucun target
         $rattachable = TestPost::create([
             'user_id' => 1,
             'title' => 'Rattachable Post',
@@ -125,7 +127,6 @@ final class ConstraintValidatorTest extends IntegrationTestCase
             'body' => 'Another content',
         ]);
 
-        // TestUser allows TestPost with DOCTOR and ADMIN → STAFF n'est pas autorisé
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Role "staff" is not allowed');
 
@@ -145,7 +146,6 @@ final class ConstraintValidatorTest extends IntegrationTestCase
             'body' => 'Content',
         ]);
 
-        // STAFF est disallowed pour TestPost dans TestDisallowedUser
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Role "staff" is disallowed');
 
@@ -165,7 +165,7 @@ final class ConstraintValidatorTest extends IntegrationTestCase
             'body' => 'First content',
         ]);
 
-        $this->validator->validateUniqueConstraints($rattachable, $post);
+        $this->validator->validateUniqueConstraints($rattachable, $post, Role::DOCTOR);
 
         $this->assertTrue(true);
     }
@@ -189,14 +189,12 @@ final class ConstraintValidatorTest extends IntegrationTestCase
             'body' => 'Second content',
         ]);
 
-        // Créer un premier attachment via le service
         $this->service->attach($rattachable, $post1, Role::DOCTOR);
 
-        // La validation unique doit lever une exception car un attachment existe déjà
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already has a unique attachment to');
 
-        $this->validator->validateUniqueConstraints($rattachable, $post2);
+        $this->validator->validateUniqueConstraints($rattachable, $post2, Role::DOCTOR);
     }
 
     public function test_validate_unique_constraints_passes_for_different_target_types(): void
@@ -217,8 +215,8 @@ final class ConstraintValidatorTest extends IntegrationTestCase
             'email' => 'another@example.com',
         ]);
 
-        $this->validator->validateUniqueConstraints($rattachable, $post);
-        $this->validator->validateUniqueConstraints($rattachable, $user);
+        $this->validator->validateUniqueConstraints($rattachable, $post, Role::DOCTOR);
+        $this->validator->validateUniqueConstraints($rattachable, $user, Role::ADMIN);
 
         $this->assertTrue(true);
     }
@@ -344,5 +342,204 @@ final class ConstraintValidatorTest extends IntegrationTestCase
         $this->expectExceptionMessage('cannot be attached to');
 
         $this->validator->validateConstraints($rattachable2, $target, Role::DOCTOR);
+    }
+
+    // ============================================================
+    // SPECIFIC UNIQUE CONSTRAINTS TESTS WITH TestSpecializedUser
+    // ============================================================
+
+    public function test_specialized_user_can_have_one_chief_hospital(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $hospital1 = TestHospital::create([
+            'name' => 'Hospital 1',
+            'address' => 'Address 1',
+        ]);
+
+        $hospital2 = TestHospital::create([
+            'name' => 'Hospital 2',
+            'address' => 'Address 2',
+        ]);
+
+        $this->service->attach($rattachable, $hospital1, Role::CHIEF);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('already has a unique attachment to');
+
+        $this->validator->validateUniqueConstraints($rattachable, $hospital2, Role::CHIEF);
+    }
+
+    public function test_specialized_user_can_have_multiple_doctor_hospitals(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $hospital1 = TestHospital::create([
+            'name' => 'Hospital 1',
+            'address' => 'Address 1',
+        ]);
+
+        $hospital2 = TestHospital::create([
+            'name' => 'Hospital 2',
+            'address' => 'Address 2',
+        ]);
+
+        $this->service->attach($rattachable, $hospital1, Role::DOCTOR);
+
+        $this->validator->validateUniqueConstraints($rattachable, $hospital2, Role::DOCTOR);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_specialized_user_can_have_one_primary_specialty(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $specialty1 = TestSpecialty::create([
+            'name' => 'Cardiology',
+            'code' => 'CAR',
+        ]);
+
+        $specialty2 = TestSpecialty::create([
+            'name' => 'Neurology',
+            'code' => 'NEU',
+        ]);
+
+        $this->service->attach($rattachable, $specialty1, Role::PRIMARY);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('already has a unique attachment to');
+
+        $this->validator->validateUniqueConstraints($rattachable, $specialty2, Role::PRIMARY);
+    }
+
+    public function test_specialized_user_can_have_multiple_secondary_specialties(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $specialty1 = TestSpecialty::create([
+            'name' => 'Cardiology',
+            'code' => 'CAR',
+        ]);
+
+        $specialty2 = TestSpecialty::create([
+            'name' => 'Neurology',
+            'code' => 'NEU',
+        ]);
+
+        $this->service->attach($rattachable, $specialty1, Role::SECONDARY);
+
+        $this->validator->validateUniqueConstraints($rattachable, $specialty2, Role::SECONDARY);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_specialized_user_can_have_one_best_friend(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $user1 = TestUser::create([
+            'name' => 'User 1',
+            'email' => 'user1@example.com',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'User 2',
+            'email' => 'user2@example.com',
+        ]);
+
+        $this->service->attach($rattachable, $user1, Role::BEST_FRIEND);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('already has a unique attachment to');
+
+        $this->validator->validateUniqueConstraints($rattachable, $user2, Role::BEST_FRIEND);
+    }
+
+    public function test_specialized_user_can_have_multiple_friends(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $user1 = TestUser::create([
+            'name' => 'User 1',
+            'email' => 'user1@example.com',
+        ]);
+
+        $user2 = TestUser::create([
+            'name' => 'User 2',
+            'email' => 'user2@example.com',
+        ]);
+
+        $this->service->attach($rattachable, $user1, Role::FRIEND);
+
+        $this->validator->validateUniqueConstraints($rattachable, $user2, Role::FRIEND);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_specialized_user_can_have_chief_and_doctor_in_different_hospitals(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $hospital1 = TestHospital::create([
+            'name' => 'Hospital 1',
+            'address' => 'Address 1',
+        ]);
+
+        $hospital2 = TestHospital::create([
+            'name' => 'Hospital 2',
+            'address' => 'Address 2',
+        ]);
+
+        $this->service->attach($rattachable, $hospital1, Role::CHIEF);
+
+        $this->validator->validateUniqueConstraints($rattachable, $hospital2, Role::DOCTOR);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_specialized_user_can_have_primary_and_secondary_specialties(): void
+    {
+        $rattachable = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $specialty1 = TestSpecialty::create([
+            'name' => 'Cardiology',
+            'code' => 'CAR',
+        ]);
+
+        $specialty2 = TestSpecialty::create([
+            'name' => 'Neurology',
+            'code' => 'NEU',
+        ]);
+
+        $this->service->attach($rattachable, $specialty1, Role::PRIMARY);
+
+        $this->validator->validateUniqueConstraints($rattachable, $specialty2, Role::SECONDARY);
+
+        $this->assertTrue(true);
     }
 }

@@ -33,7 +33,7 @@ final class TestConstrainedUser extends Model implements RattachmentConstraintsI
     public function uniqueTargets(): array
     {
         return [
-            TestPost::class,
+            TestPost::class => [],
         ];
     }
 }

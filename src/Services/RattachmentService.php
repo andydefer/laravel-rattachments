@@ -43,7 +43,7 @@ final class RattachmentService implements RattachmentServiceInterface
     public function attach(Model $rattachable, Model $target, EnumerableInterface $role, array $metadata = []): Model
     {
         $this->constraintValidator->validateConstraints($rattachable, $target, $role);
-        $this->constraintValidator->validateUniqueConstraints($rattachable, $target);
+        $this->constraintValidator->validateUniqueConstraints($rattachable, $target, $role);
 
         if ($this->isAttached($rattachable, $target)) {
             throw new RuntimeException(sprintf(
@@ -623,7 +623,7 @@ final class RattachmentService implements RattachmentServiceInterface
             $metadata = $targetData['metadata'] ?? [];
 
             $this->constraintValidator->validateConstraints($rattachable, $target, $role);
-            $this->constraintValidator->validateUniqueConstraints($rattachable, $target);
+            $this->constraintValidator->validateUniqueConstraints($rattachable, $target, $role);
 
             $newTargetIds[] = $target->getKey();
 

@@ -51,7 +51,9 @@ final class ConstraintDiscoveryServiceTest extends IntegrationTestCase
         $this->assertArrayHasKey('uniqueTargets', $constraints);
 
         $this->assertArrayHasKey(TestPost::class, $constraints['allowedTargets']);
-        $this->assertContains(TestPost::class, $constraints['uniqueTargets']);
+
+        $this->assertArrayHasKey(TestPost::class, $constraints['uniqueTargets']);
+        $this->assertEmpty($constraints['uniqueTargets'][TestPost::class]);
     }
 
     public function test_discover_constrained_models_ignores_non_constrained_models(): void
@@ -84,7 +86,7 @@ final class ConstraintDiscoveryServiceTest extends IntegrationTestCase
 
         $models = $this->discoveryService->discoverConstrainedModels($sources);
 
-        $this->assertCount(5, $models);
+        $this->assertCount(8, $models);
         $this->assertArrayHasKey(TestConstrainedUser::class, $models);
     }
 

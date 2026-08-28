@@ -12,7 +12,10 @@ use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCheckPoint;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestHospital;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPost;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestSpecializedUser;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestSpecialty;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelRattachments\Tests\IntegrationTestCase;
 use Illuminate\Support\Facades\Schema;
@@ -38,6 +41,7 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
 
         $this->createTestData();
         $this->createDisallowedTestData();
+        $this->createSpecializedTestData();
     }
 
     protected function tearDown(): void
@@ -80,6 +84,27 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
             'location' => 'Test Location',
             'is_active' => true,
         ]);
+    }
+
+    private function createSpecializedTestData(): void
+    {
+        $specializedUser = TestSpecializedUser::create([
+            'name' => 'Specialized User',
+            'email' => 'specialized@example.com',
+        ]);
+
+        $hospital = TestHospital::create([
+            'name' => 'Test Hospital',
+            'address' => 'Test Address',
+        ]);
+
+        $specialty = TestSpecialty::create([
+            'name' => 'Cardiology',
+            'code' => 'CAR',
+        ]);
+
+        $this->rattachmentService->attach($specializedUser, $hospital, Role::CHIEF);
+        $this->rattachmentService->attach($specializedUser, $specialty, Role::PRIMARY);
     }
 
     public function test_inspect_shows_constraints_for_specific_models(): void
@@ -471,5 +496,64 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('🚫 Disallowed targets', $response->output);
         $this->assertStringContainsString('TestConstrainedUser', $response->output);
         $this->assertStringContainsString('✅ Allowed targets', $response->output);
+    }
+
+    // ============================================================
+    // SPECIFIC UNIQUE CONSTRAINTS TESTS
+    // ============================================================
+
+    public function test_inspect_shows_specific_unique_targets_with_roles(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestSpecializedUser] --constraints'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔒 Unique targets', $response->output);
+        $this->assertStringContainsString('TestHospital', $response->output);
+        $this->assertStringContainsString('one-to-one (roles: chief)', $response->output);
+        $this->assertStringContainsString('TestSpecialty', $response->output);
+        $this->assertStringContainsString('one-to-one (roles: primary)', $response->output);
+        $this->assertStringContainsString('TestUser', $response->output);
+        $this->assertStringContainsString('one-to-one (roles: best_friend)', $response->output);
+    }
+
+    public function test_inspect_shows_specific_unique_connections_for_specialized_user(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestSpecializedUser] --connections'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔗 EXISTING CONNECTIONS', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestHospital', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestSpecialty', $response->output);
+        $this->assertStringContainsString('1x', $response->output);
+    }
+
+    public function test_inspect_shows_roles_by_connection_for_specialized_user(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestSpecializedUser] --connections'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('📋 Roles by connection', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestHospital', $response->output);
+        $this->assertStringContainsString('chief', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestSpecialty', $response->output);
+        $this->assertStringContainsString('primary', $response->output);
+    }
+
+    public function test_inspect_shows_missing_connections_for_specialized_user(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestSpecializedUser] --connections'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('Possible missing connections', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestUser', $response->output);
+        $this->assertStringContainsString('Constraint defined but no connections found', $response->output);
     }
 }

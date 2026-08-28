@@ -19,7 +19,6 @@ use RuntimeException;
  *
  * This class handles all constraint validation logic for attachments,
  * including allowed targets, disallowed targets, unique targets, and role validation.
- * It is used by both the service layer and the model to ensure consistency.
  */
 final class ConstraintValidator implements ConstraintValidatorInterface
 {
@@ -57,7 +56,7 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     /**
      * {@inheritDoc}
      */
-    public function validateUniqueConstraints(Model $rattachable, Model $target): void
+    public function validateUniqueConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void
     {
         if (! $rattachable instanceof RattachmentConstraintsInterface) {
             return;
@@ -69,15 +68,31 @@ final class ConstraintValidator implements ConstraintValidatorInterface
 
         $targetClass = $target->getMorphClass();
 
-        if (! in_array($targetClass, $uniqueTargets, true)) {
+        if (! array_key_exists($targetClass, $uniqueTargets)) {
             return;
         }
 
-        $filter = RattachmentFilterRecord::from([
+        $uniqueRoles = $uniqueTargets[$targetClass];
+
+        // Construire le filtre
+        $filterData = [
             'rattachable_type' => $rattachable->getMorphClass(),
             'rattachable_id' => $rattachable->getKey(),
             'target_type' => $targetClass,
-        ]);
+        ];
+
+        // Si des rôles sont spécifiés, vérifier UNIQUEMENT pour ces rôles
+        if (! empty($uniqueRoles)) {
+            // Vérifier si ce rôle est dans la liste des rôles uniques
+            if (! $this->isRoleInArray($role, $uniqueRoles)) {
+                return; // Ce rôle n'est pas concerné par la contrainte unique
+            }
+
+            // Filtrer par rôle également
+            $filterData['role'] = $role->getValue();
+        }
+
+        $filter = RattachmentFilterRecord::from($filterData);
 
         $findByRecord = new FindByRecord(
             filters: $filter,
@@ -87,11 +102,27 @@ final class ConstraintValidator implements ConstraintValidatorInterface
         $exists = $this->repository->findBy($findByRecord)->isNotEmpty();
 
         if ($exists) {
+            if (empty($uniqueRoles)) {
+                throw new RuntimeException(sprintf(
+                    '%s already has a unique attachment to %s. Only one %s is allowed.',
+                    $rattachable->getMorphClass(),
+                    $targetClass,
+                    class_basename($targetClass)
+                ));
+            }
+
+            $roleLabels = implode(', ', array_map(
+                fn ($r) => $r instanceof EnumerableInterface ? $r->getValue() : (string) $r,
+                $uniqueRoles
+            ));
+
             throw new RuntimeException(sprintf(
-                '%s already has a unique attachment to %s. Only one %s is allowed.',
+                '%s already has a unique attachment to %s with role "%s". Only one %s with role %s is allowed.',
                 $rattachable->getMorphClass(),
                 $targetClass,
-                class_basename($targetClass)
+                $role->getValue(),
+                class_basename($targetClass),
+                $roleLabels
             ));
         }
     }
@@ -135,6 +166,24 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     }
 
     /**
+     * Checks if a role is in an array of roles.
+     *
+     * @param  EnumerableInterface  $role  The role to check
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles
+     * @return bool True if the role is in the array
+     */
+    private function isRoleInArray(EnumerableInterface $role, array $roles): bool
+    {
+        foreach ($roles as $r) {
+            if ($r instanceof EnumerableInterface && $r->getValue() === $role->getValue()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Validates disallowed targets with role restrictions.
      *
      * @param  Model  $rattachable  The rattachable model
@@ -166,7 +215,7 @@ final class ConstraintValidator implements ConstraintValidatorInterface
             ));
         }
 
-        if (in_array($role, $disallowedRoles, true)) {
+        if ($this->isRoleInArray($role, $disallowedRoles)) {
             $disallowedValues = array_map(fn ($r) => $r->getValue(), $disallowedRoles);
             throw new RuntimeException(sprintf(
                 'Role "%s" is disallowed for %s -> %s. Disallowed roles: %s',
@@ -205,7 +254,7 @@ final class ConstraintValidator implements ConstraintValidatorInterface
         }
 
         $allowedRoles = $allowed[$targetClass];
-        if (! in_array($role, $allowedRoles, true)) {
+        if (! $this->isRoleInArray($role, $allowedRoles)) {
             $allowedValues = array_map(fn ($r) => $r->getValue(), $allowedRoles);
             throw new RuntimeException(sprintf(
                 'Role "%s" is not allowed for %s -> %s. Allowed roles: %s',

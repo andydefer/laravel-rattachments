@@ -149,6 +149,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
             /** @var RattachmentConstraintsInterface $instance */
             $instance = new $modelClass;
             $allowedTargets = $instance->allowedTargets();
+
             $uniqueTargets = method_exists($instance, 'uniqueTargets')
                 ? $instance->uniqueTargets()
                 : [];
@@ -247,9 +248,16 @@ final class RattachmentsInspectDirective extends AbstractDirective
         }
 
         $uniqueData = MapCollection::from([]);
-        foreach ($unique as $target) {
+
+        foreach ($unique as $target => $roles) {
             $shortTarget = $this->shortenClassName($target);
-            $uniqueData = $uniqueData->put($shortTarget, 'one-to-one');
+
+            if (empty($roles)) {
+                $uniqueData = $uniqueData->put($shortTarget, 'one-to-one (any role)');
+            } else {
+                $rolesLabel = implode(', ', $this->formatRoles($roles));
+                $uniqueData = $uniqueData->put($shortTarget, 'one-to-one (roles: '.$rolesLabel.')');
+            }
         }
 
         $this->getConsole()->raw(KeyValue::renderWithValueColor($uniqueData, 'yellow'));

@@ -9,16 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Contract for validating attachment constraints.
- *
- * This interface defines the contract for validating all attachment constraints,
- * including allowed targets, disallowed targets, unique targets, and role validation.
  */
 interface ConstraintValidatorInterface
 {
     /**
      * Validates that the attachment respects the constraints defined by the rattachable model.
-     *
-     * Checks disallowed targets (with role restrictions), allowed targets, and allowed roles.
      *
      * @param  Model  $rattachable  The model being attached
      * @param  Model  $target  The target model
@@ -31,14 +26,13 @@ interface ConstraintValidatorInterface
     /**
      * Validates that the attachment does not violate unique target constraints.
      *
-     * A model can only have ONE attachment per unique target type.
-     *
      * @param  Model  $rattachable  The model being attached
      * @param  Model  $target  The target model
+     * @param  EnumerableInterface  $role  The role
      *
      * @throws \RuntimeException If unique constraint is violated
      */
-    public function validateUniqueConstraints(Model $rattachable, Model $target): void;
+    public function validateUniqueConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void;
 
     /**
      * Validates that a role value is allowed for a specific context.
