@@ -143,7 +143,6 @@ final class RattachmentsInspectDirective extends AbstractDirective
             $this->line("📦 {$shortName}");
             $this->line("   FQCN: {$modelClass}");
 
-            // ✅ Vérifier si la clé existe
             $implementsInterface = $data['implementsInterface'] ?? true;
 
             if (! $implementsInterface) {
@@ -161,12 +160,12 @@ final class RattachmentsInspectDirective extends AbstractDirective
             } else {
                 $allowedData = MapCollection::from([]);
                 foreach ($allowed as $target => $roles) {
-                    $shortTarget = basename(str_replace('\\', '/', $target));
+                    // ✅ Afficher le FQCN complet, pas seulement le nom court
                     $rolesLabel = array_map(
                         fn ($role) => $role instanceof \BackedEnum ? $role->value : (string) $role,
                         $roles
                     );
-                    $allowedData = $allowedData->put($shortTarget, implode(', ', $rolesLabel));
+                    $allowedData = $allowedData->put($target, implode(', ', $rolesLabel));
                 }
                 $this->getConsole()->raw(KeyValue::renderWithValueColor($allowedData, 'green'));
             }
@@ -178,8 +177,8 @@ final class RattachmentsInspectDirective extends AbstractDirective
             } else {
                 $uniqueData = MapCollection::from([]);
                 foreach ($unique as $target) {
-                    $shortTarget = basename(str_replace('\\', '/', $target));
-                    $uniqueData = $uniqueData->put($shortTarget, 'one-to-one');
+                    // ✅ Afficher le FQCN complet
+                    $uniqueData = $uniqueData->put($target, 'one-to-one');
                 }
                 $this->getConsole()->raw(KeyValue::renderWithValueColor($uniqueData, 'yellow'));
             }
