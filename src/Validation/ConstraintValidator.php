@@ -29,42 +29,32 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     /**
      * {@inheritDoc}
      */
-    public function validateConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void
-    {
-        if (! $rattachable instanceof RattachmentInterface) {
-            throw new RuntimeException(sprintf(
-                'Model %s must implement %s to be attachable.',
-                get_class($rattachable),
-                RattachmentInterface::class
-            ));
-        }
-
-        if (! $target instanceof RattachmentInterface) {
-            throw new RuntimeException(sprintf(
-                'Model %s must implement %s to be a target.',
-                get_class($target),
-                RattachmentInterface::class
-            ));
-        }
+    public function validateConstraints(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role
+    ): void {
+        $this->validateSelfAttachment($rattachable, $target);
 
         $targetClass = $target->getMorphClass();
 
         $this->validateDisallowedTargets($rattachable, $targetClass, $role);
         $this->validateAllowedTargets($rattachable, $targetClass, $role);
+        $this->validateCircularity($rattachable, $target, $role);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function validateUniqueConstraints(Model $rattachable, Model $target, EnumerableInterface $role): void
-    {
-        if (! $rattachable instanceof RattachmentInterface) {
-            return;
-        }
+    public function validateUniqueConstraints(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role
+    ): void {
+        // ✅ Détecter la circularité dans uniqueTargets AVANT de vérifier l'existence
+        $this->validateUniqueCircularity($rattachable, $target, $role);
 
-        $uniqueTargets = method_exists($rattachable, 'uniqueTargets')
-            ? $rattachable->uniqueTargets()
-            : [];
+        $uniqueTargets = $rattachable->uniqueTargets();
 
         $targetClass = $target->getMorphClass();
 
@@ -74,21 +64,17 @@ final class ConstraintValidator implements ConstraintValidatorInterface
 
         $uniqueRoles = $uniqueTargets[$targetClass];
 
-        // Construire le filtre
         $filterData = [
             'rattachable_type' => $rattachable->getMorphClass(),
             'rattachable_id' => $rattachable->getKey(),
             'target_type' => $targetClass,
         ];
 
-        // Si des rôles sont spécifiés, vérifier UNIQUEMENT pour ces rôles
         if (! empty($uniqueRoles)) {
-            // Vérifier si ce rôle est dans la liste des rôles uniques
             if (! $this->isRoleInArray($role, $uniqueRoles)) {
-                return; // Ce rôle n'est pas concerné par la contrainte unique
+                return;
             }
 
-            // Filtrer par rôle également
             $filterData['role'] = $role->getValue();
         }
 
@@ -186,20 +172,18 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     /**
      * Validates disallowed targets with role restrictions.
      *
-     * @param  Model  $rattachable  The rattachable model
+     * @param  Model&RattachmentInterface  $rattachable  The rattachable model
      * @param  string  $targetClass  The target class
      * @param  EnumerableInterface  $role  The role
      *
      * @throws RuntimeException If target or role is disallowed
      */
     private function validateDisallowedTargets(
-        Model $rattachable,
+        Model&RattachmentInterface $rattachable,
         string $targetClass,
         EnumerableInterface $role
     ): void {
-        $disallowed = method_exists($rattachable, 'disallowedTargets')
-            ? $rattachable->disallowedTargets()
-            : [];
+        $disallowed = $rattachable->disallowedTargets();
 
         if (! array_key_exists($targetClass, $disallowed)) {
             return;
@@ -230,14 +214,14 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     /**
      * Validates allowed targets and roles.
      *
-     * @param  Model  $rattachable  The rattachable model
+     * @param  Model&RattachmentInterface  $rattachable  The rattachable model
      * @param  string  $targetClass  The target class
      * @param  EnumerableInterface  $role  The role
      *
      * @throws RuntimeException If target or role is not allowed
      */
     private function validateAllowedTargets(
-        Model $rattachable,
+        Model&RattachmentInterface $rattachable,
         string $targetClass,
         EnumerableInterface $role
     ): void {
@@ -375,6 +359,122 @@ final class ConstraintValidator implements ConstraintValidatorInterface
                     $rattachableClass
                 )
             );
+        }
+    }
+
+    /**
+     * Validates that a model is not attached to itself.
+     *
+     * @param  Model&RattachmentInterface  $rattachable  The rattachable model
+     * @param  Model&RattachmentInterface  $target  The target model
+     *
+     * @throws RuntimeException If the model is attached to itself
+     */
+    private function validateSelfAttachment(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target
+    ): void {
+        if ($rattachable->getMorphClass() === $target->getMorphClass()
+            && $rattachable->getKey() === $target->getKey()) {
+            throw new RuntimeException(sprintf(
+                'Cannot attach a model to itself. %s %s cannot be attached to itself.',
+                $rattachable->getMorphClass(),
+                $rattachable->getKey()
+            ));
+        }
+    }
+
+    /**
+     * Detects circular attachment relationships.
+     *
+     * If both models allow each other as targets with the same role,
+     * throws an exception to prevent circular references.
+     *
+     * @param  Model&RattachmentInterface  $rattachable  The rattachable model
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  EnumerableInterface  $role  The role
+     *
+     * @throws RuntimeException If circularity is detected
+     */
+    private function validateCircularity(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role
+    ): void {
+        // Si c'est le même type, pas de circularité (ex: User → User avec FriendRole)
+        if ($rattachable->getMorphClass() === $target->getMorphClass()) {
+            return;
+        }
+
+        $targetAllowed = $target->allowedTargets();
+
+        $rattachableClass = $rattachable->getMorphClass();
+        $targetClass = $target->getMorphClass();
+
+        if (! isset($targetAllowed[$rattachableClass])) {
+            return;
+        }
+
+        $targetAllowedRoles = $targetAllowed[$rattachableClass];
+
+        if (in_array($role, $targetAllowedRoles, true)) {
+            throw new RuntimeException(sprintf(
+                'Circular relationship detected: %s → %s with role "%s" and %s → %s with the same role. '
+                .'To avoid circular references, define the relationship in only one direction.',
+                $rattachableClass,
+                $targetClass,
+                $role->getValue(),
+                $targetClass,
+                $rattachableClass
+            ));
+        }
+    }
+
+    /**
+     * Detects circular unique constraints.
+     *
+     * If both models have unique constraints on each other with the same role,
+     * throws an exception to prevent circular dependencies.
+     *
+     * @param  Model&RattachmentInterface  $rattachable  The rattachable model
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  EnumerableInterface  $role  The role
+     *
+     * @throws RuntimeException If circular unique constraint is detected
+     */
+    private function validateUniqueCircularity(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role
+    ): void {
+        // Si c'est le même type, pas de circularité
+        if ($rattachable->getMorphClass() === $target->getMorphClass()) {
+            return;
+        }
+
+        $targetUniqueTargets = $target->uniqueTargets();
+
+        $rattachableClass = $rattachable->getMorphClass();
+        $targetClass = $target->getMorphClass();
+
+        // Vérifier si le target a aussi une contrainte unique sur le rattachable
+        if (! isset($targetUniqueTargets[$rattachableClass])) {
+            return;
+        }
+
+        $targetUniqueRoles = $targetUniqueTargets[$rattachableClass];
+
+        // Si le tableau est vide (any role) ou si le rôle est spécifiquement listé
+        if (empty($targetUniqueRoles) || in_array($role, $targetUniqueRoles, true)) {
+            throw new RuntimeException(sprintf(
+                'Circular unique constraint detected: %s → %s with role "%s" and %s → %s with the same role. '
+                .'This creates a circular dependency. Define the unique constraint in only one direction.',
+                $rattachableClass,
+                $targetClass,
+                $role->getValue(),
+                $targetClass,
+                $rattachableClass
+            ));
         }
     }
 }

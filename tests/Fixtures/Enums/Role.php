@@ -38,6 +38,7 @@ enum Role: string implements EnumerableInterface
     case REPORTED = 'reported';
     case APPROVED = 'approved';
     case REJECTED = 'rejected';
+    case PARTNER = 'partner';
 
     public function getValue(): string
     {
@@ -77,6 +78,7 @@ enum Role: string implements EnumerableInterface
             self::REPORTED => 'Signalé',
             self::APPROVED => 'Approuvé',
             self::REJECTED => 'Rejeté',
+            self::PARTNER => 'Partenaire',
         };
     }
 }

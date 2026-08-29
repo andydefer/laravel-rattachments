@@ -7,6 +7,9 @@ namespace AndyDefer\LaravelRattachments\Tests\Integration\Validation;
 use AndyDefer\LaravelRattachments\Enums\UnknownRole;
 use AndyDefer\LaravelRattachments\Services\RattachmentService;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Enums\Role;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCircularHospital;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCircularSpecialty;
+use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestCircularUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestConstrainedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestDisallowedUser;
 use AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestHospital;
@@ -65,37 +68,6 @@ final class ConstraintValidatorTest extends IntegrationTestCase
         $this->validator->validateConstraints($rattachable, $post, Role::DOCTOR);
 
         $this->assertTrue(true);
-    }
-
-    public function test_validate_constraints_throws_exception_when_rattachable_does_not_implement_interface(): void
-    {
-        $rattachable = TestPlainUser::create([
-            'name' => 'Plain User',
-            'email' => 'plain@example.com',
-        ]);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'Model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentInterface to be attachable.'
-        );
-
-        $this->validator->validateConstraints($rattachable, $this->post, Role::DOCTOR);
-    }
-
-    public function test_validate_constraints_throws_exception_when_target_does_not_implement_interface(): void
-    {
-        $rattachable = $this->user;
-        $target = TestPlainUser::create([
-            'name' => 'Plain Target',
-            'email' => 'plain-target@example.com',
-        ]);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'Model AndyDefer\LaravelRattachments\Tests\Fixtures\Models\TestPlainUser must implement AndyDefer\LaravelRattachments\Contracts\RattachmentInterface to be a target.'
-        );
-
-        $this->validator->validateConstraints($rattachable, $target, Role::DOCTOR);
     }
 
     public function test_validate_constraints_throws_exception_when_target_not_allowed(): void
@@ -539,6 +511,82 @@ final class ConstraintValidatorTest extends IntegrationTestCase
         $this->service->attach($rattachable, $specialty1, Role::PRIMARY);
 
         $this->validator->validateUniqueConstraints($rattachable, $specialty2, Role::SECONDARY);
+
+        $this->assertTrue(true);
+    }
+
+    // ============================================================
+    // CIRCULARITY TESTS
+    // ============================================================
+
+    public function test_circular_allowed_targets_throws_exception(): void
+    {
+        $circularUser = TestCircularUser::create([
+            'name' => 'Circular User',
+            'email' => 'circular@example.com',
+        ]);
+
+        $circularHospital = TestCircularHospital::create([
+            'name' => 'Circular Hospital',
+            'address' => 'Address',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Circular relationship detected');
+
+        $this->validator->validateConstraints($circularUser, $circularHospital, Role::CHIEF);
+    }
+
+    public function test_circular_allowed_targets_passes_with_different_role(): void
+    {
+        $circularUser = TestCircularUser::create([
+            'name' => 'Circular User',
+            'email' => 'circular@example.com',
+        ]);
+
+        $circularHospital = TestCircularHospital::create([
+            'name' => 'Circular Hospital',
+            'address' => 'Address',
+        ]);
+
+        $this->validator->validateConstraints($circularUser, $circularHospital, Role::DOCTOR);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_circular_unique_targets_throws_exception(): void
+    {
+        $circularUser = TestCircularUser::create([
+            'name' => 'Circular User',
+            'email' => 'circular@example.com',
+        ]);
+
+        $circularHospital = TestCircularHospital::create([
+            'name' => 'Circular Hospital',
+            'address' => 'Address',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Circular unique constraint detected');
+
+        $this->validator->validateUniqueConstraints($circularUser, $circularHospital, Role::CHIEF);
+    }
+
+    public function test_circular_unique_targets_passes_with_no_circularity(): void
+    {
+        $circularUser = TestCircularUser::create([
+            'name' => 'Circular User',
+            'email' => 'circular@example.com',
+        ]);
+
+        $circularSpecialty = TestCircularSpecialty::create([
+            'name' => 'Cardiology',
+            'code' => 'CAR',
+        ]);
+
+        // TestCircularSpecialty n'a PAS de uniqueTargets sur TestCircularUser
+        // Donc pas de circularité → OK
+        $this->validator->validateUniqueConstraints($circularUser, $circularSpecialty, Role::SECONDARY);
 
         $this->assertTrue(true);
     }
