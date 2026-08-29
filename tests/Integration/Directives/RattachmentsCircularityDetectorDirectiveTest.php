@@ -82,6 +82,61 @@ final class RattachmentsCircularityDetectorDirectiveTest extends IntegrationTest
         $this->assertStringContainsString('Total violations found: 0', $response->output);
     }
 
+    public function test_ignore_skipped_flag_hides_skipped_items(): void
+    {
+        $response = $this->service->run(
+            'rattachments:circularity [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularUser] [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularUser] --ignore-skipped'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringNotContainsString('Skipped:', $response->output);
+        $this->assertStringNotContainsString('same class', $response->output);
+        $this->assertStringContainsString('No circularity violations detected', $response->output);
+    }
+
+    public function test_ignore_skipped_flag_hides_not_implementing_interface_skips(): void
+    {
+        $response = $this->service->run(
+            'rattachments:circularity [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestPlainUser] [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularUser] --ignore-skipped'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringNotContainsString('does not implement RattachmentInterface. Skipped.', $response->output);
+        $this->assertStringContainsString('No circularity violations detected', $response->output);
+    }
+
+    public function test_ignore_skipped_flag_shows_circularities_when_present(): void
+    {
+        $response = $this->service->run(
+            'rattachments:circularity [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularUser] [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularHospital] --ignore-skipped'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('Circular relationship', $response->output);
+        $this->assertStringContainsString('role "chief"', $response->output);
+        $this->assertStringContainsString('Total violations found: 1', $response->output);
+    }
+
+    public function test_ignore_skipped_flag_with_multiple_models_hides_skips_shows_circularities(): void
+    {
+        $response = $this->service->run(
+            'rattachments:circularity [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularUser, AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularHospital] [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularHospital, AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestCircularSpecialty] --ignore-skipped'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+
+        // Les circularités sont toujours affichées
+        $this->assertStringContainsString('Circular relationship', $response->output);
+        $this->assertStringContainsString('chief', $response->output);
+        $this->assertStringContainsString('primary', $response->output);
+
+        // Les skips ne sont pas affichés
+        $this->assertStringNotContainsString('Skipped:', $response->output);
+        $this->assertStringNotContainsString('same class', $response->output);
+
+        $this->assertStringContainsString('Total violations found: 2', $response->output);
+    }
+
     public function test_handles_models_not_implementing_interface(): void
     {
         $response = $this->service->run(
@@ -139,7 +194,7 @@ final class RattachmentsCircularityDetectorDirectiveTest extends IntegrationTest
         $this->assertStringContainsString('TestCircularHospital', $response->output);
         $this->assertStringContainsString('TestCircularSpecialty', $response->output);
 
-        // Vérifier les circularités détectées - utiliser des sous-chaînes sans flèche
+        // Vérifier les circularités détectées
         $this->assertStringContainsString('TestCircularUser', $response->output);
         $this->assertStringContainsString('TestCircularHospital', $response->output);
         $this->assertStringContainsString('chief', $response->output);

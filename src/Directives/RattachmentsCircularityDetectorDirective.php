@@ -23,6 +23,9 @@ use Illuminate\Support\Collection;
  *
  * // Check multiple models
  * ./bin/app rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital]
+ *
+ * // Check with skipping same-class notifications
+ * ./bin/app rattachments:circularity [App.Models.User] [App.Models.Profile] --ignore-skipped
  */
 final class RattachmentsCircularityDetectorDirective extends AbstractDirective
 {
@@ -32,7 +35,8 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
     {
         return 'rattachments:circularity 
                 {rattachables*}#"List of rattachable models to check (e.g., [App.Models.User, App.Models.Doctor])" 
-                {targets*}#"List of target models to check (e.g., [App.Models.Profile, App.Models.Hospital])"';
+                {targets*}#"List of target models to check (e.g., [App.Models.Profile, App.Models.Hospital])"
+                {--ignore-skipped}#"Do not display skipped items (same class, not implementing interface)"';
     }
 
     public function getDescription(): string
@@ -52,6 +56,7 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
 
         $rattachables = $this->getVariadic('rattachables');
         $targets = $this->getVariadic('targets');
+        $ignoreSkipped = $this->getFlag('ignore-skipped');
 
         if (empty($rattachables) || empty($targets)) {
             $this->error('❌ You must specify both rattachables and targets.');
@@ -68,7 +73,7 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
         $this->info('📋 Targets: '.implode(', ', $targets));
         $this->newLine();
 
-        $violations = $this->detectViolations($rattachables, $targets);
+        $violations = $this->detectViolations($rattachables, $targets, $ignoreSkipped);
 
         if ($violations->isEmpty()) {
             $this->info('✅ No circularity violations detected.');
@@ -77,7 +82,7 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
             return ExitCode::SUCCESS;
         }
 
-        $this->displayViolations($violations);
+        $this->displayViolations($violations, $ignoreSkipped);
 
         $this->newLine();
         $this->info('✅ Circularity check completed');
@@ -93,7 +98,7 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
         return array_values($items);
     }
 
-    private function detectViolations(array $rattachables, array $targets): Collection
+    private function detectViolations(array $rattachables, array $targets, bool $ignoreSkipped): Collection
     {
         $violations = collect();
 
@@ -110,10 +115,12 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
             $rattachable = new $rattachableClass;
 
             if (! $rattachable instanceof RattachmentInterface) {
-                $violations->push([
-                    'type' => 'skip',
-                    'message' => "{$rattachableClass} does not implement RattachmentInterface. Skipped.",
-                ]);
+                if (! $ignoreSkipped) {
+                    $violations->push([
+                        'type' => 'skip',
+                        'message' => "{$rattachableClass} does not implement RattachmentInterface. Skipped.",
+                    ]);
+                }
 
                 continue;
             }
@@ -130,10 +137,12 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
 
                 // Skip si même classe
                 if ($rattachableClass === $targetClass) {
-                    $violations->push([
-                        'type' => 'skip',
-                        'message' => "Skipped: {$rattachableClass} → {$targetClass} (same class)",
-                    ]);
+                    if (! $ignoreSkipped) {
+                        $violations->push([
+                            'type' => 'skip',
+                            'message' => "Skipped: {$rattachableClass} → {$targetClass} (same class)",
+                        ]);
+                    }
 
                     continue;
                 }
@@ -141,10 +150,12 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
                 $target = new $targetClass;
 
                 if (! $target instanceof RattachmentInterface) {
-                    $violations->push([
-                        'type' => 'skip',
-                        'message' => "{$targetClass} does not implement RattachmentInterface. Skipped.",
-                    ]);
+                    if (! $ignoreSkipped) {
+                        $violations->push([
+                            'type' => 'skip',
+                            'message' => "{$targetClass} does not implement RattachmentInterface. Skipped.",
+                        ]);
+                    }
 
                     continue;
                 }
@@ -269,7 +280,7 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
         return array_values(array_intersect($rattachableValues, $targetValues));
     }
 
-    private function displayViolations(Collection $violations): void
+    private function displayViolations(Collection $violations, bool $ignoreSkipped): void
     {
         $this->renderSectionHeader('🚨 VIOLATIONS DETECTED');
 
@@ -298,7 +309,8 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
             }
         }
 
-        if ($skips->isNotEmpty()) {
+        // Afficher les skips uniquement si ignore-skipped n'est pas actif
+        if (! $ignoreSkipped && $skips->isNotEmpty()) {
             $this->line('   ⏭️  Skipped:');
             $this->newLine();
 
@@ -320,6 +332,12 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
 
         $totalViolations = $circularities->count() + $uniqueCircularities->count();
         $this->newLine();
+
+        if ($ignoreSkipped && $skips->isNotEmpty()) {
+            $this->info('ℹ️  Skipped items hidden (use without --ignore-skipped to see them)');
+            $this->newLine();
+        }
+
         $this->error("⚠️  Total violations found: {$totalViolations}");
     }
 

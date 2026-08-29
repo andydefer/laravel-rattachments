@@ -1389,8 +1389,14 @@ php artisan rattachments:circularity [App.Models.User] [App.Models.Profile]
 # Détecter les circularités entre plusieurs modèles
 php artisan rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital]
 
+# Ignorer les messages "Skipped" (same class, n'implémente pas l'interface)
+php artisan rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital] --ignore-skipped
+
 # Utiliser des alias pour la détection de circularité
 php artisan rc [App.Models.User] [App.Models.Profile]
+
+# Utiliser l'alias avec le flag --ignore-skipped
+php artisan rc [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital] --ignore-skipped
 ```
 
 ### Exemple de sortie - `rattachments:inspect`
@@ -1447,6 +1453,8 @@ User → Specialty                                               : ⚠️ Constr
 
 ### Exemple de sortie - `rattachments:circularity`
 
+#### Sans `--ignore-skipped` (affichage complet)
+
 ```
 🔄 Checking circularity violations...
 
@@ -1475,6 +1483,49 @@ User → Specialty                                               : ⚠️ Constr
 
 ✅ Circularity check completed
 ```
+
+#### Avec `--ignore-skipped` (sortie épurée)
+
+```
+🔄 Checking circularity violations...
+
+📋 Rattachables: App\Models\User, App\Models\Doctor
+📋 Targets: App\Models\Profile, App\Models\Hospital
+
+═══════════════════════════════════════════════════════════════════════
+  🚨 VIOLATIONS DETECTED
+═══════════════════════════════════════════════════════════════════════
+
+   🔄 Circular relationships:
+
+   🔴 Circular relationship: App\Models\User → App\Models\Profile with role "user"
+      and App\Models\Profile → App\Models\User with same role.
+
+   🔒 Circular unique constraints:
+
+   🔴 Circular unique constraint: App\Models\User → App\Models\Hospital with role "chief"
+      and App\Models\Hospital → App\Models\User with same role.
+
+ℹ️  Skipped items hidden (use without --ignore-skipped to see them)
+
+⚠️  Total violations found: 2
+
+✅ Circularity check completed
+```
+
+### Options de la commande `rattachments:circularity`
+
+| Option | Description |
+|--------|-------------|
+| `--ignore-skipped` | Masque les éléments "Skipped" (même classe, n'implémente pas l'interface) pour une sortie plus épurée |
+
+### Alias disponibles
+
+| Commande | Alias | Description |
+|----------|-------|-------------|
+| `rattachments:inspect` | `ri` | Inspection des contraintes et connexions |
+| `rattachments:circularity` | `rc` | Détection de circularité |
+| `rattachments:circularity` | `rattachments:check-circularity` | Détection de circularité (nom long) |
 ---
 
 ## 📦 Dépendances

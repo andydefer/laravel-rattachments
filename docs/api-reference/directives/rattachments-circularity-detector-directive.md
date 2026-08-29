@@ -11,8 +11,6 @@ AbstractDirective
     └── RattachmentsCircularityDetectorDirective
 ```
 
-**Interfaces implémentées :** Aucune
-
 **Classe parente :** `AndyDefer\Directive\AbstractDirective`
 
 ## Rôle principal
@@ -36,14 +34,15 @@ Elle compare systématiquement chaque paire `rattachable → target` pour vérif
 |-----------|------|-------------|
 | - | - | - |
 
-**Retourne :** `string` - La signature de la commande CLI
+**Retourne :** `string` - La signature de la commande CLI avec ses arguments et options
 
 **Exemple :**
 ```php
 $signature = $directive->getSignature();
 // 'rattachments:circularity 
 //  {rattachables*}#"List of rattachable models..."
-//  {targets*}#"List of target models..."'
+//  {targets*}#"List of target models..."
+//  {--ignore-skipped}#"Do not display skipped items..."'
 ```
 
 ---
@@ -86,9 +85,12 @@ $aliases = $directive->getAliases();
 |-----------|------|-------------|
 | - | - | - |
 
-**Retourne :** `ExitCode` - Code de sortie de la commande (`SUCCESS` ou `INVALID_ARGUMENT`)
+**Retourne :** `ExitCode` - Code de sortie de la commande
 
-**Exceptions :** Aucune (les erreurs sont affichées dans la sortie console)
+| Code | Signification |
+|------|---------------|
+| `ExitCode::SUCCESS` | Exécution réussie (0) |
+| `ExitCode::INVALID_ARGUMENT` | Arguments manquants (2) |
 
 **Exemple :**
 ```bash
@@ -177,7 +179,24 @@ class Hospital implements RattachmentInterface
 
 ---
 
-### Cas 3 : Inspection de plusieurs modèles
+### Cas 3 : Ignorer les skips avec `--ignore-skipped`
+
+**Problème** : Lorsqu'on inspecte plusieurs modèles, la sortie est polluée par de nombreux messages "Skipped" (même classe, n'implémente pas l'interface).
+
+**Solution** : Utiliser le flag `--ignore-skipped` pour masquer ces messages.
+
+```bash
+./bin/app rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.User, App.Models.Profile] --ignore-skipped
+
+# 🔄 Circular relationships:
+# 🔴 Circular relationship: User → Profile with role "user" and Profile → User with same role.
+# ⚠️ Total violations found: 1
+# ℹ️  Skipped items hidden (use without --ignore-skipped to see them)
+```
+
+---
+
+### Cas 4 : Inspection de plusieurs modèles
 
 **Problème** : Vérifier toutes les circularités entre plusieurs types de modèles.
 
@@ -194,8 +213,8 @@ class Hospital implements RattachmentInterface
 
 ## Gestion des erreurs
 
-| Situation | Exception | Message |
-|-----------|-----------|---------|
+| Situation | Code | Message |
+|-----------|------|---------|
 | Aucun rattachable spécifié | `ExitCode::INVALID_ARGUMENT` | `You must specify both rattachables and targets.` |
 | Aucun target spécifié | `ExitCode::INVALID_ARGUMENT` | `You must specify both rattachables and targets.` |
 | Classe introuvable | (affichée dans la sortie) | `Class not found: {class}` |
@@ -235,10 +254,11 @@ La directive est conçue pour être utilisée en développement ou en CI pour d�
 ```bash
 #!/bin/bash
 
-# Exemple d'exécution complète
+# Exemple d'exécution complète avec ignore-skipped
 ./bin/app rattachments:circularity \
     [App.Models.User, App.Models.Admin] \
-    [App.Models.Profile, App.Models.Hospital, App.Models.Specialty]
+    [App.Models.Profile, App.Models.Hospital, App.Models.Specialty] \
+    --ignore-skipped
 
 # Sortie attendue :
 # 🔄 Checking circularity violations...
@@ -260,13 +280,11 @@ La directive est conçue pour être utilisée en développement ou en CI pour d�
 #    🔴 Circular unique constraint: App\Models\User → App\Models\Hospital with role "chief"
 #       and App\Models\Hospital → App\Models\User with same role.
 # 
-#    ⏭️  Skipped:
-# 
-#    Skipped: App\Models\Admin → App\Models\Admin (same class)
-# 
 #    ❌ Errors:
 # 
 #    Class not found: App\Models\NonExistent
+# 
+# ℹ️  Skipped items hidden (use without --ignore-skipped to see them)
 # 
 # ⚠️  Total violations found: 2
 # 
@@ -279,3 +297,4 @@ La directive est conçue pour être utilisée en développement ou en CI pour d�
 - `RattachmentInterface::allowedTargets()` - Définition des cibles autorisées
 - `RattachmentInterface::uniqueTargets()` - Définition des contraintes uniques
 - `RattachmentsInspectDirective` - Inspection générale des contraintes
+- `AbstractDirective` - Classe de base des directives CLI
