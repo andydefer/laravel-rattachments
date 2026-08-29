@@ -21,6 +21,7 @@ Un package Laravel complet pour gérer des relations polymorphiques doubles entr
 - [Utilisation avec le trait](#-utilisation-avec-le-trait)
 - [Exemples concrets](#-exemples-concrets)
 - [Cas d'usage](#-cas-dusage)
+- [Règles du système](#-règles-du-système)
 - [Inspection CLI](#-inspection-cli)
 - [Dépendances](#-dépendances)
 - [Licence](#-licence)
@@ -126,6 +127,8 @@ $post->attachTo($tag, TagRole::TAG); // Un tag
 - ✅ **Contraintes uniques granulaires** - Un seul attachement par type ET rôle
 - ✅ **UnknownRole** - Rétrocompatibilité pour les rôles supprimés
 - ✅ **Typage strict** - Utilisation de `Model&RattachmentInterface` pour la sécurité des types
+- ✅ **Détection de circularité** - Empêche les relations circulaires
+- ✅ **Auto-attachement** - Empêche un modèle de s'attacher à lui-même
 - ✅ **Tests complets** - Couverture complète des tests d'intégration
 
 ---
@@ -1097,6 +1100,267 @@ class Doctor extends Model implements RattachmentInterface
 | Employé → Projet | Employee → Project | `ProjectRole::LEAD` |
 | Projet → Client | Project → Client | `ClientRole::ACTIVE` |
 | Tâche → Employé | Task → Employee | `TaskRole::ASSIGNED` |
+
+---
+
+## 📋 Règles du système
+
+### Règle 1 : Toute relation est orientée
+
+```
+Qui attache (rattachable) → Qui est attaché (target)
+```
+
+```php
+$user->attachTo($profile, ProfileRole::USER);
+// User est le rattachable, Profile est le target
+// "User a un Profile"
+```
+
+---
+
+### Règle 2 : Les modèles doivent implémenter l'interface
+
+```php
+// ❌ Erreur
+class User extends Model
+{
+    use HasRattachments;
+}
+
+// ✅ OK
+class User extends Model implements RattachmentInterface
+{
+    use HasRattachments;
+}
+```
+
+---
+
+### Règle 3 : Le rôle est obligatoire
+
+```php
+// ❌ Erreur
+$user->attachTo($profile);
+
+// ✅ OK
+$user->attachTo($profile, ProfileRole::USER);
+```
+
+---
+
+### Règle 4 : `disallowedTargets` a priorité sur `allowedTargets`
+
+```php
+public function allowedTargets(): array
+{
+    return [
+        Profile::class => [ProfileRole::USER, ProfileRole::ADMIN],
+    ];
+}
+
+public function disallowedTargets(): array
+{
+    return [
+        Profile::class => [ProfileRole::ADMIN],  // ✅ ADMIN est bloqué
+    ];
+}
+```
+
+**Résultat :**
+```php
+// ✅ OK
+$user->attachTo($profile, ProfileRole::USER);
+
+// ❌ Erreur - ADMIN est bloqué
+$user->attachTo($profile, ProfileRole::ADMIN);
+// Role "admin" is disallowed
+```
+
+---
+
+### Règle 5 : Circularité - INTERDITE
+
+Deux modèles ne peuvent pas s'autoriser mutuellement avec le même rôle.
+
+```php
+// ❌ Erreur - Circularité
+class User implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            Profile::class => [ProfileRole::USER],
+        ];
+    }
+}
+
+class Profile implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            User::class => [ProfileRole::USER],  // ❌ Circularité !
+        ];
+    }
+}
+
+// Exception: Circular relationship detected: User → Profile with role "user"
+// and Profile → User with the same role.
+```
+
+
+```php
+// ❌ Erreur - Circularité sur uniqueTargets
+class User implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            Profile::class => [ProfileRole::USER],
+        ];
+    }
+
+    public function uniqueTargets(): array
+    {
+        return [
+            Profile::class => [ProfileRole::USER],  // Un User ne peut avoir qu'un seul Profile
+        ];
+    }
+}
+
+class Profile implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            User::class => [ProfileRole::USER],
+        ];
+    }
+
+    public function uniqueTargets(): array
+    {
+        return [
+            User::class => [ProfileRole::USER],  // Un Profile ne peut appartenir qu'à un seul User
+        ];
+    }
+}
+
+// 💥 Exception: Circular unique constraint detected: User → Profile with role "user"
+// and Profile → User with the same role.
+// This creates a circular dependency. Define the unique constraint in only one direction.
+```
+
+
+**Exceptions :**
+- ✅ Les relations entre modèles de même type (ex: `User → User`) ne sont pas concernées
+
+
+
+---
+
+### Règle 6 : Auto-attachement - INTERDIT
+
+```php
+// ❌ Erreur
+$user->attachTo($user, FriendRole::FRIEND);
+// Cannot attach a model to itself. App\Models\User 1 cannot be attached to itself.
+```
+
+---
+
+### Règle 7 : Ordre de validation
+
+```
+1. Auto-attachement
+2. Cibles interdites (disallowedTargets)
+3. Cibles autorisées (allowedTargets)
+4. Circularité
+5. Contraintes uniques (uniqueTargets)
+```
+
+---
+
+### Règle 8 : Résumé des contraintes
+
+| Contrainte | Priorité |
+|------------|----------|
+| `disallowedTargets` | 🔴 **Maximale** |
+| `uniqueTargets` | 🟡 Élevée |
+| `allowedTargets` | 🟢 Normale |
+
+---
+
+### Règle 9 : Bonnes pratiques
+
+**Une direction unique**
+
+```php
+// ✅ Recommandé
+class User implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            Profile::class => [ProfileRole::USER],
+        ];
+    }
+}
+
+class Profile implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [];  // ❌ Ne pas autoriser l'inverse
+    }
+}
+```
+
+**Interdire la mauvaise direction**
+
+```php
+class Profile implements RattachmentInterface
+{
+    public function disallowedTargets(): array
+    {
+        return [
+            User::class => [ProfileRole::USER],  // ✅ Bloque l'inverse
+        ];
+    }
+}
+```
+
+**Ne pas contredire `allowedTargets`**
+
+```php
+// ❌ À ÉVITER
+class User implements RattachmentInterface
+{
+    public function allowedTargets(): array
+    {
+        return [
+            Profile::class => [ProfileRole::USER],  // ✅ Autorisé
+        ];
+    }
+
+    public function disallowedTargets(): array
+    {
+        return [
+            Profile::class => [ProfileRole::USER],  // ❌ Mais aussi bloqué !
+        ];
+    }
+}
+```
+
+**Symétrie explicite**
+
+```php
+public function becomeFriendWith(User $friend): void
+{
+    $this->attachTo($friend, FriendRole::FRIEND);
+    $friend->attachTo($this, FriendRole::FRIEND);
+}
+```
 
 ---
 
