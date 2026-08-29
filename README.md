@@ -1363,8 +1363,7 @@ public function becomeFriendWith(User $friend): void
 ```
 
 ---
-
-## 🔍 Inspection CLI
+# 🔍 Inspection CLI
 
 ### Commandes
 
@@ -1381,14 +1380,20 @@ php artisan rattachments:inspect [App.Models.User] --connections
 # Afficher uniquement les contraintes
 php artisan rattachments:inspect [App.Models.User] --constraints
 
-# Découverte automatique
-php artisan rattachments:inspect --constraints
-
 # Utiliser des alias
 php artisan ri [App.Models.User] --constraints
+
+# Détecter les circularités entre modèles
+php artisan rattachments:circularity [App.Models.User] [App.Models.Profile]
+
+# Détecter les circularités entre plusieurs modèles
+php artisan rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital]
+
+# Utiliser des alias pour la détection de circularité
+php artisan rc [App.Models.User] [App.Models.Profile]
 ```
 
-### Exemple de sortie
+### Exemple de sortie - `rattachments:inspect`
 
 ```
 🔍 Inspecting rattachments...
@@ -1440,6 +1445,36 @@ User → Specialty                                               : ⚠️ Constr
 ✅ Inspection completed
 ```
 
+### Exemple de sortie - `rattachments:circularity`
+
+```
+🔄 Checking circularity violations...
+
+📋 Rattachables: App\Models\User, App\Models\Doctor
+📋 Targets: App\Models\Profile, App\Models\Hospital
+
+═══════════════════════════════════════════════════════════════════════
+  🚨 VIOLATIONS DETECTED
+═══════════════════════════════════════════════════════════════════════
+
+   🔄 Circular relationships:
+
+   🔴 Circular relationship: App\Models\User → App\Models\Profile with role "user"
+      and App\Models\Profile → App\Models\User with same role.
+
+   🔒 Circular unique constraints:
+
+   🔴 Circular unique constraint: App\Models\User → App\Models\Hospital with role "chief"
+      and App\Models\Hospital → App\Models\User with same role.
+
+   ⏭️  Skipped:
+
+   Skipped: App\Models\Doctor → App\Models\Doctor (same class)
+
+⚠️  Total violations found: 2
+
+✅ Circularity check completed
+```
 ---
 
 ## 📦 Dépendances

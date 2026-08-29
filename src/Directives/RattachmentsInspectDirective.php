@@ -10,7 +10,6 @@ use AndyDefer\Directive\Enums\ExitCode;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\DomainStructures\Utils\MapCollection;
 use AndyDefer\LaravelRattachments\Contracts\RattachmentInterface;
-use AndyDefer\LaravelRattachments\Contracts\Services\ConstraintDiscoveryServiceInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -37,15 +36,12 @@ final class RattachmentsInspectDirective extends AbstractDirective
 
     private const CONNECTION_SECTION = '🔗 EXISTING CONNECTIONS';
 
-    private const DEFAULT_SOURCE = 'app.Models';
-
     private const LINE_LENGTH = 60;
 
     public function getSignature(): string
     {
         return 'rattachments:inspect 
                 {models*}#"List of models to inspect (e.g., [App.Models.User, App.Models.Hospital])"
-                {sources*}#"Directories to scan for discovery (e.g., [app.Models, tests.Fixtures.Models])"
                 {--connections}#"Show existing connections in database"
                 {--constraints}#"Show model constraints only"';
     }
@@ -65,6 +61,16 @@ final class RattachmentsInspectDirective extends AbstractDirective
         $this->info('🔍 Inspecting rattachments...');
         $this->newLine();
 
+        $models = $this->getVariadic('models');
+
+        if (empty($models)) {
+            $this->error('❌ You must specify at least one model to inspect.');
+            $this->newLine();
+            $this->info('Usage: ./bin/app rattachments:inspect [App.Models.User, App.Models.Hospital]');
+
+            return ExitCode::INVALID_ARGUMENT;
+        }
+
         $showConnections = $this->getFlag('connections');
         $showConstraints = $this->getFlag('constraints');
 
@@ -73,7 +79,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
             $showConstraints = true;
         }
 
-        $constrainedModels = $this->resolveModels();
+        $constrainedModels = $this->filterModels($models);
 
         if ($showConstraints) {
             $this->displayConstraints($constrainedModels);
@@ -87,29 +93,6 @@ final class RattachmentsInspectDirective extends AbstractDirective
         $this->info('✅ Inspection completed');
 
         return ExitCode::SUCCESS;
-    }
-
-    private function resolveModels(): array
-    {
-        $models = $this->getVariadic('models');
-
-        if (! empty($models)) {
-            return $this->filterModels($models);
-        }
-
-        $this->info('No models specified. Discovering models from sources...');
-
-        $sources = $this->getVariadic('sources');
-        if (empty($sources)) {
-            $sources = [self::DEFAULT_SOURCE];
-            $this->info('No sources specified. Using default: '.self::DEFAULT_SOURCE);
-        }
-
-        $this->info('Scanning sources: '.implode(', ', $sources));
-
-        $discoveryService = $this->getApplication()->make(ConstraintDiscoveryServiceInterface::class);
-
-        return $discoveryService->discoverConstrainedModels($sources);
     }
 
     private function filterModels(array $models): array

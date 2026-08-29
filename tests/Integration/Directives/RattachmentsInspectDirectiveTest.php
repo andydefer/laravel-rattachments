@@ -194,39 +194,12 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('Class not found', $response->output);
     }
 
-    public function test_inspect_with_no_models_discover_automatically(): void
+    public function test_inspect_with_no_models_returns_error(): void
     {
         $response = $this->service->run('rattachments:inspect [] --constraints');
 
-        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('No models specified. Discovering models from sources...', $response->output);
-        $this->assertStringContainsString('No sources specified. Using default: app.Models', $response->output);
-        $this->assertStringContainsString('Scanning sources: app.Models', $response->output);
-        $this->assertStringContainsString('No constrained models found.', $response->output);
-    }
-
-    public function test_inspect_with_sources_discover_automatically(): void
-    {
-        $response = $this->service->run(
-            'rattachments:inspect [] [tests.Fixtures.Models] --constraints'
-        );
-
-        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('No models specified. Discovering models from sources...', $response->output);
-        $this->assertStringContainsString('Scanning sources: tests.Fixtures.Models', $response->output);
-        $this->assertStringContainsString('TestConstrainedUser', $response->output);
-    }
-
-    public function test_inspect_with_multiple_sources(): void
-    {
-        $response = $this->service->run(
-            'rattachments:inspect [] [app.Models, tests.Fixtures.Models] --constraints'
-        );
-
-        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('No models specified. Discovering models from sources...', $response->output);
-        $this->assertStringContainsString('Scanning sources: app.Models, tests.Fixtures.Models', $response->output);
-        $this->assertStringContainsString('TestConstrainedUser', $response->output);
+        $this->assertSame(ExitCode::INVALID_ARGUMENT, $response->exit_code);
+        $this->assertStringContainsString('You must specify at least one model to inspect', $response->output);
     }
 
     public function test_inspect_with_alias_works(): void
@@ -348,26 +321,6 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
         $this->assertStringContainsString('No constrained models found. Nothing to display.', $response->output);
-    }
-
-    public function test_inspect_with_models_and_sources_prioritizes_models(): void
-    {
-        $response = $this->service->run(
-            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] [app.Models, tests.Fixtures.Models] --constraints'
-        );
-
-        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('TestConstrainedUser', $response->output);
-        $this->assertStringNotContainsString('Scanning sources:', $response->output);
-    }
-
-    public function test_inspect_with_empty_sources_uses_default(): void
-    {
-        $response = $this->service->run('rattachments:inspect [] [] --constraints');
-
-        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('No models specified. Discovering models from sources...', $response->output);
-        $this->assertStringContainsString('No sources specified. Using default: app.Models', $response->output);
     }
 
     // ============================================================
