@@ -427,6 +427,66 @@ trait HasRattachments
     }
 
     /**
+     * Retrieves all models attached to this model (when this model is used as target) of a specific type.
+     *
+     * @param  string  $rattachableClass  The rattachable class FQCN (e.g., User::class)
+     * @return Collection<int, Model> Collection of attached models
+     */
+    public function getRattachablesByType(string $rattachableClass): Collection
+    {
+        return $this->getRattachmentService()->getRattachablesByType($this, $rattachableClass);
+    }
+
+    /**
+     * Retrieves all models attached to this model (when this model is used as target) of a specific type with pagination.
+     *
+     * @param  string  $rattachableClass  The rattachable class FQCN (e.g., User::class)
+     * @param  int  $perPage  Items per page
+     * @param  int  $page  Page number
+     * @return LengthAwarePaginator Paginated results
+     */
+    public function getRattachablesByTypePaginated(string $rattachableClass, int $perPage = 15, int $page = 1): LengthAwarePaginator
+    {
+        return $this->getRattachmentService()->getRattachablesByTypePaginated($this, $rattachableClass, $perPage, $page);
+    }
+
+    /**
+     * Retrieves all models attached to this model (when this model is used as target) of a specific type and role.
+     *
+     * @param  string  $rattachableClass  The rattachable class FQCN (e.g., User::class)
+     * @param  EnumerableInterface  $role  The role to filter by
+     * @return Collection<int, Model> Collection of attached models
+     */
+    public function getRattachablesByTypeAndRole(string $rattachableClass, EnumerableInterface $role): Collection
+    {
+        return $this->getRattachmentService()->getRattachablesByTypeAndRole($this, $rattachableClass, $role);
+    }
+
+    /**
+     * Retrieves all models attached to this model (when this model is used as target) of a specific type with multiple roles.
+     *
+     * @param  string  $rattachableClass  The rattachable class FQCN (e.g., User::class)
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles to filter by
+     * @return Collection<int, Model> Collection of attached models
+     */
+    public function getRattachablesByTypeAndRoles(string $rattachableClass, array $roles): Collection
+    {
+        return $this->getRattachmentService()->getRattachablesByTypeAndRoles($this, $rattachableClass, $roles);
+    }
+
+    /**
+     * Retrieves all models attached to this model (when this model is used as target) of multiple types with multiple roles.
+     *
+     * @param  array<int, string>  $rattachableClasses  Array of rattachable class FQCNs
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles to filter by
+     * @return Collection<int, Model> Collection of attached models
+     */
+    public function getRattachablesByTypesAndRoles(array $rattachableClasses, array $roles): Collection
+    {
+        return $this->getRattachmentService()->getRattachablesByTypesAndRoles($this, $rattachableClasses, $roles);
+    }
+
+    /**
      * Counts all models attached to this model.
      *
      * @return int Total number of attached models

@@ -123,7 +123,7 @@ $post->attachTo($tag, TagRole::TAG); // Un tag
 - ✅ **Synchronisation** - Synchronisez tous les rattachements d'un modèle en une seule opération
 - ✅ **Pagination** - Récupérez les résultats paginés
 - ✅ **Inspection CLI** - Directive `rattachments:inspect` pour analyser les contraintes
-- ✅ **Découverte automatique** - Scan des modèles implémentant l'interface
+- ✅ **Détection de circularité CLI** - Directive `rattachments:circularity` pour détecter les relations circulaires
 - ✅ **Contraintes uniques granulaires** - Un seul attachement par type ET rôle
 - ✅ **UnknownRole** - Rétrocompatibilité pour les rôles supprimés
 - ✅ **Typage strict** - Utilisation de `Model&RattachmentInterface` pour la sécurité des types
@@ -611,6 +611,18 @@ $doctors = $this->rattachmentService->getRattachables($hospital);
 // Récupérer les modèles rattachés avec un rôle spécifique
 $doctors = $this->rattachmentService->getRattachablesByRole($hospital, HospitalUserRole::DOCTOR);
 
+// Récupérer les modèles rattachés d'un type spécifique
+$doctors = $this->rattachmentService->getRattachablesByType($hospital, Doctor::class);
+
+// Récupérer les modèles rattachés d'un type et rôle spécifiques
+$chiefs = $this->rattachmentService->getRattachablesByTypeAndRole($hospital, Doctor::class, HospitalRole::CHIEF);
+
+// Récupérer les modèles rattachés d'un type avec plusieurs rôles
+$staff = $this->rattachmentService->getRattachablesByTypeAndRoles($hospital, Doctor::class, [HospitalRole::DOCTOR, HospitalRole::CHIEF]);
+
+// Récupérer les modèles rattachés de plusieurs types avec plusieurs rôles
+$personnel = $this->rattachmentService->getRattachablesByTypesAndRoles($hospital, [Doctor::class, Nurse::class], [HospitalRole::DOCTOR, HospitalRole::STAFF]);
+
 // Récupérer toutes les cibles d'un modèle
 $hospitals = $this->rattachmentService->getTargets($doctor);
 
@@ -653,6 +665,14 @@ $doctors = $this->rattachmentService->getRattachablesPaginated($hospital, 10, 2)
 $doctors = $this->rattachmentService->getRattachablesByRolePaginated(
     $hospital,
     HospitalUserRole::DOCTOR,
+    10,
+    2
+);
+
+// Paginer les rattachables par type
+$doctors = $this->rattachmentService->getRattachablesByTypePaginated(
+    $hospital,
+    Doctor::class,
     10,
     2
 );
@@ -730,6 +750,28 @@ $roles = $this->rattachmentService->getDistinctRolesForRattachable($doctor);
 
 // Rôles distincts pour ce modèle comme cible
 $roles = $this->rattachmentService->getDistinctRolesForTarget($hospital);
+```
+
+### Attachements entre types
+
+```php
+// Vérifier si des attachements existent entre deux types
+$exists = $this->rattachmentService->hasAttachmentsBetweenTypes(
+    Doctor::class,
+    Hospital::class
+);
+
+// Récupérer tous les attachements entre deux types
+$attachments = $this->rattachmentService->getAttachmentsBetweenTypes(
+    Doctor::class,
+    Hospital::class
+);
+
+// Supprimer tous les attachements entre deux types
+$count = $this->rattachmentService->deleteAllAttachmentsBetweenTypes(
+    Doctor::class,
+    Hospital::class
+);
 ```
 
 ---
@@ -1363,7 +1405,8 @@ public function becomeFriendWith(User $friend): void
 ```
 
 ---
-# 🔍 Inspection CLI
+
+## 🔍 Inspection CLI
 
 ### Commandes
 
@@ -1587,6 +1630,7 @@ editor                                                       : 4
 | `rattachments:inspect` | `ri` | Inspection des contraintes et connexions |
 | `rattachments:circularity` | `rc` | Détection de circularité |
 | `rattachments:circularity` | `rattachments:check-circularity` | Détection de circularité (nom long) |
+
 ---
 
 ## 📦 Dépendances

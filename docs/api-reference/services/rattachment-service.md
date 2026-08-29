@@ -197,6 +197,86 @@ $doctors = $service->getRattachables($hospital);
 
 ---
 
+### `getRattachablesByType(Model&RattachmentInterface $target, string $rattachableClass): Collection`
+
+Récupère les modèles attachés à une cible d'un type spécifique.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model&RattachmentInterface` | Modèle cible |
+| `$rattachableClass` | `string` | FQCN de la classe source |
+
+**Retourne :** `Collection<int, Model&RattachmentInterface>` - Modèles du type
+
+**Exemple :**
+```php
+$doctors = $service->getRattachablesByType($hospital, User::class);
+```
+
+---
+
+### `getRattachablesByTypePaginated(Model&RattachmentInterface $target, string $rattachableClass, int $perPage = 15, int $page = 1): LengthAwarePaginator`
+
+Version paginée de `getRattachablesByType()`.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model&RattachmentInterface` | Modèle cible |
+| `$rattachableClass` | `string` | FQCN de la classe source |
+| `$perPage` | `int` | Éléments par page |
+| `$page` | `int` | Numéro de la page |
+
+**Retourne :** `LengthAwarePaginator` - Résultats paginés
+
+---
+
+### `getRattachablesByTypeAndRole(Model&RattachmentInterface $target, string $rattachableClass, EnumerableInterface $role): Collection`
+
+Récupère les modèles attachés à une cible d'un type et rôle spécifiques.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model&RattachmentInterface` | Modèle cible |
+| `$rattachableClass` | `string` | FQCN de la classe source |
+| `$role` | `EnumerableInterface` | Rôle à filtrer |
+
+**Retourne :** `Collection<int, Model&RattachmentInterface>` - Modèles filtrés
+
+**Exemple :**
+```php
+$chiefs = $service->getRattachablesByTypeAndRole($hospital, User::class, HospitalRole::CHIEF);
+```
+
+---
+
+### `getRattachablesByTypeAndRoles(Model&RattachmentInterface $target, string $rattachableClass, array $roles): Collection`
+
+Récupère les modèles attachés à une cible d'un type avec plusieurs rôles.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model&RattachmentInterface` | Modèle cible |
+| `$rattachableClass` | `string` | FQCN de la classe source |
+| `$roles` | `array<int, EnumerableInterface>` | Rôles à filtrer |
+
+**Retourne :** `Collection<int, Model&RattachmentInterface>` - Modèles correspondants
+
+---
+
+### `getRattachablesByTypesAndRoles(Model&RattachmentInterface $target, array $rattachableClasses, array $roles): Collection`
+
+Récupère les modèles attachés à une cible de plusieurs types avec plusieurs rôles.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$target` | `Model&RattachmentInterface` | Modèle cible |
+| `$rattachableClasses` | `array<int, string>` | FQCN des classes sources |
+| `$roles` | `array<int, EnumerableInterface>` | Rôles à filtrer |
+
+**Retourne :** `Collection<int, Model&RattachmentInterface>` - Modèles correspondants
+
+---
+
 ### `getRattachablesPaginated(Model&RattachmentInterface $target, int $perPage = 15, int $page = 1): LengthAwarePaginator`
 
 Version paginée de `getRattachables()`.
@@ -602,6 +682,18 @@ class HospitalService
     {
         $this->rattachmentService->updateRole($doctor, $hospital, HospitalRole::CHIEF);
     }
+
+    public function getChief(Hospital $hospital): ?Doctor
+    {
+        return $this->rattachmentService
+            ->getRattachablesByTypeAndRole($hospital, Doctor::class, HospitalRole::CHIEF)
+            ->first();
+    }
+
+    public function countDoctors(Hospital $hospital): int
+    {
+        return $this->rattachmentService->countRattachablesByRole($hospital, HospitalRole::DOCTOR);
+    }
 }
 ```
 
@@ -616,17 +708,27 @@ class PostService
         foreach ($tagData as $data) {
             $targets[] = [
                 'target' => $data['tag'],
-                'role' => $data['role'] ?? TagRole::TAG,
+                'role' => $data['role'] ?? TagRole::REGULAR,
                 'metadata' => ['added_by' => auth()->id()],
             ];
         }
 
         return $this->rattachmentService->syncAttachments($post, $targets);
     }
+
+    public function getPrimaryTags(Post $post): Collection
+    {
+        return $this->rattachmentService->getTargetsByTypeAndRole($post, Tag::class, TagRole::PRIMARY);
+    }
+
+    public function removeTag(Post $post, Tag $tag): void
+    {
+        $this->rattachmentService->detach($post, $tag);
+    }
 }
 ```
 
-### Cas 3 : Relations sociales
+### Cas 3 : Relations sociales (réseau social)
 
 ```php
 class UserService
@@ -644,6 +746,24 @@ class UserService
     public function getFollowers(User $user): Collection
     {
         return $this->rattachmentService->getRattachablesByRole($user, FollowRole::FOLLOWER);
+    }
+
+    public function getFollowing(User $user): Collection
+    {
+        return $this->rattachmentService->getTargetsByRole($user, FollowRole::FOLLOWER);
+    }
+
+    public function getFollowCounts(User $user): array
+    {
+        return [
+            'followers' => $this->rattachmentService->countRattachablesByRole($user, FollowRole::FOLLOWER),
+            'following' => $this->rattachmentService->countTargetsByRole($user, FollowRole::FOLLOWER),
+        ];
+    }
+
+    public function isFollowing(User $follower, User $followee): bool
+    {
+        return $this->rattachmentService->isAttached($follower, $followee);
     }
 }
 ```
@@ -672,6 +792,56 @@ class TeamService
     {
         return $this->rattachmentService->getRattachables($team);
     }
+
+    public function getAdmins(Team $team): Collection
+    {
+        return $this->rattachmentService->getRattachablesByRole($team, TeamRole::ADMIN);
+    }
+
+    public function isMember(Team $team, User $user): bool
+    {
+        return $this->rattachmentService->isAttached($team, $user);
+    }
+
+    public function updateMemberRole(Team $team, User $user, TeamRole $newRole): void
+    {
+        $this->rattachmentService->updateRole($team, $user, $newRole);
+    }
+}
+```
+
+### Cas 5 : Gestion des médicaments et fabricants
+
+```php
+class DrugService
+{
+    public function addManufacturer(Drug $drug, Manufacturer $manufacturer): void
+    {
+        $this->rattachmentService->attach(
+            $drug,
+            $manufacturer,
+            DrugRole::MANUFACTURER,
+            ['added_at' => now()->toDateTimeString()]
+        );
+    }
+
+    public function getManufacturers(Drug $drug): Collection
+    {
+        return $this->rattachmentService->getTargetsByTypeAndRole(
+            $drug,
+            Manufacturer::class,
+            DrugRole::MANUFACTURER
+        );
+    }
+
+    public function getDrugsByManufacturer(Manufacturer $manufacturer): Collection
+    {
+        return $this->rattachmentService->getRattachablesByTypeAndRole(
+            $manufacturer,
+            Drug::class,
+            DrugRole::MANUFACTURER
+        );
+    }
 }
 ```
 
@@ -681,8 +851,6 @@ class TeamService
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Rattachable n'implémente pas l'interface | `RuntimeException` | `Model {class} must implement RattachmentInterface to be attachable.` |
-| Target n'implémente pas l'interface | `RuntimeException` | `Model {class} must implement RattachmentInterface to be a target.` |
 | Target non autorisé | `RuntimeException` | `{rattachable} cannot be attached to {target}. Allowed targets: {allowed}` |
 | Rôle non autorisé | `RuntimeException` | `Role "{role}" is not allowed for {rattachable} -> {target}. Allowed roles: {allowed}` |
 | Rôle interdit | `RuntimeException` | `Role "{role}" is disallowed for {rattachable} -> {target}. Disallowed roles: {disallowed}` |
@@ -691,6 +859,7 @@ class TeamService
 | Attachement inexistant | `RuntimeException` | `{rattachable} {id} is not attached to {target} {id}` |
 | Sync sans `target` | `RuntimeException` | `Each target must have "target" key` |
 | Sync sans `role` | `RuntimeException` | `Each target must have "role" key` |
+| Circularité détectée | `RuntimeException` | `Circular relationship detected: {rattachable} → {target} with role "{role}" and {target} → {rattachable} with the same role.` |
 
 ---
 

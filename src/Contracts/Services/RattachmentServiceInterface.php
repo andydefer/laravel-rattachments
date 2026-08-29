@@ -387,4 +387,54 @@ interface RattachmentServiceInterface
      * @throws \RuntimeException If any target is invalid or constraints are violated
      */
     public function syncAttachments(Model&RattachmentInterface $rattachable, array $targets): Collection;
+
+    /**
+     * Retrieves all models attached to a target model of a specific type.
+     *
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  string  $rattachableClass  The rattachable class FQCN
+     * @return Collection<int, Model&RattachmentInterface> Collection of attached models
+     */
+    public function getRattachablesByType(Model&RattachmentInterface $target, string $rattachableClass): Collection;
+
+    /**
+     * Retrieves all models attached to a target model of a specific type with pagination.
+     *
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  string  $rattachableClass  The rattachable class FQCN
+     * @param  int  $perPage  Items per page
+     * @param  int  $page  Page number
+     * @return LengthAwarePaginator Paginated results
+     */
+    public function getRattachablesByTypePaginated(Model&RattachmentInterface $target, string $rattachableClass, int $perPage = 15, int $page = 1): LengthAwarePaginator;
+
+    /**
+     * Retrieves all models attached to a target model of a specific type and role.
+     *
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  string  $rattachableClass  The rattachable class FQCN
+     * @param  EnumerableInterface  $role  The role to filter by
+     * @return Collection<int, Model&RattachmentInterface> Collection of attached models
+     */
+    public function getRattachablesByTypeAndRole(Model&RattachmentInterface $target, string $rattachableClass, EnumerableInterface $role): Collection;
+
+    /**
+     * Retrieves all models attached to a target model of a specific type with multiple roles.
+     *
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  string  $rattachableClass  The rattachable class FQCN
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles to filter by
+     * @return Collection<int, Model&RattachmentInterface> Collection of attached models
+     */
+    public function getRattachablesByTypeAndRoles(Model&RattachmentInterface $target, string $rattachableClass, array $roles): Collection;
+
+    /**
+     * Retrieves all models attached to a target model of multiple types with multiple roles.
+     *
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  array<int, string>  $rattachableClasses  Array of rattachable class FQCNs
+     * @param  array<int, EnumerableInterface>  $roles  Array of roles to filter by
+     * @return Collection<int, Model&RattachmentInterface> Collection of attached models
+     */
+    public function getRattachablesByTypesAndRoles(Model&RattachmentInterface $target, array $rattachableClasses, array $roles): Collection;
 }

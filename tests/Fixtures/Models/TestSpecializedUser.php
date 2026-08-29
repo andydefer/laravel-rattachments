@@ -35,7 +35,7 @@ final class TestSpecializedUser extends Model implements RattachmentInterface
         return [
             TestPost::class => [Role::DOCTOR, Role::ADMIN, Role::STAFF],
             TestUser::class => [Role::ADMIN, Role::STAFF, Role::FRIEND, Role::BEST_FRIEND],
-            TestHospital::class => [Role::DOCTOR, Role::CHIEF, Role::ADMIN],
+            TestHospital::class => [Role::DOCTOR, Role::ADMIN],
             TestSpecialty::class => [Role::PRIMARY, Role::SECONDARY, Role::SPECIALIST],
         ];
     }

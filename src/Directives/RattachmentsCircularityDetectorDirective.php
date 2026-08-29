@@ -175,8 +175,9 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
         $rattachableClass = $rattachable->getMorphClass();
         $targetClass = $target->getMorphClass();
 
-        $rattachableAllowed = $rattachable->allowedTargets();
-        $targetAllowed = $target->allowedTargets();
+        // ✅ Fusionner allowedTargets() + uniqueTargets()
+        $rattachableAllowed = $this->getEffectiveAllowedTargets($rattachable);
+        $targetAllowed = $this->getEffectiveAllowedTargets($target);
 
         // Vérifier si le rattachable autorise le target
         if (! isset($rattachableAllowed[$targetClass])) {
@@ -263,6 +264,33 @@ final class RattachmentsCircularityDetectorDirective extends AbstractDirective
                 ),
             ]);
         }
+    }
+
+    /**
+     * Fusionne allowedTargets() et uniqueTargets() pour la détection de circularité.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function getEffectiveAllowedTargets(RattachmentInterface $model): array
+    {
+        $allowed = $model->allowedTargets();
+        $unique = $model->uniqueTargets();
+
+        $result = $allowed;
+
+        foreach ($unique as $targetClass => $roles) {
+            if (! isset($result[$targetClass])) {
+                $result[$targetClass] = [];
+            }
+
+            foreach ($roles as $role) {
+                if (! in_array($role, $result[$targetClass], true)) {
+                    $result[$targetClass][] = $role;
+                }
+            }
+        }
+
+        return $result;
     }
 
     private function findCommonRoles(array $rattachableRoles, array $targetRoles): array

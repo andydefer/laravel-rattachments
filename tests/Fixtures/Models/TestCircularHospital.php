@@ -26,19 +26,14 @@ final class TestCircularHospital extends Model implements RattachmentInterface
     public function allowedTargets(): array
     {
         return [
-            // Circularité avec TestCircularUser avec le même rôle CHIEF
-            TestCircularUser::class => [Role::CHIEF, Role::ADMIN],
-            // Pas de circularité (rôles différents)
-            TestCircularSpecialty::class => [Role::SPECIALIST],
+            TestCircularUser::class => [Role::ADMIN],
         ];
     }
 
     public function uniqueTargets(): array
     {
         return [
-            // Circularité unique avec TestCircularUser avec le même rôle CHIEF
             TestCircularUser::class => [Role::CHIEF],
-            // Pas de circularité (rôle différent)
             TestCircularSpecialty::class => [Role::SPECIALIST],
         ];
     }

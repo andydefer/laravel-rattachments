@@ -259,6 +259,134 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertContains($user2->id, $rattachables->pluck('id')->toArray());
     }
 
+    // ✅ CORRIGÉ : Utiliser TestUser au lieu de TestCheckPoint
+    public function test_get_rattachables_by_type_returns_filtered_collection(): void
+    {
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+        $this->service->attach($user2, $this->post, Role::ADMIN);
+
+        // Récupérer uniquement les TestUser attachés au post
+        $rattachables = $this->service->getRattachablesByType(
+            $this->post,
+            TestUser::class
+        );
+
+        $this->assertCount(2, $rattachables);
+        $this->assertContains($this->user->id, $rattachables->pluck('id')->toArray());
+        $this->assertContains($user2->id, $rattachables->pluck('id')->toArray());
+
+        // Vérifier que les deux sont bien des TestUser
+        foreach ($rattachables as $rattachable) {
+            $this->assertInstanceOf(TestUser::class, $rattachable);
+        }
+    }
+
+    public function test_get_rattachables_by_type_paginated_returns_paginated_results(): void
+    {
+        // Créer 5 utilisateurs attachés au post
+        for ($i = 1; $i <= 5; $i++) {
+            $user = TestUser::create([
+                'name' => "User {$i}",
+                'email' => "user{$i}@example.com",
+            ]);
+            $this->service->attach($user, $this->post, Role::DOCTOR);
+        }
+
+        // Pagination : 2 par page, page 1
+        $paginator = $this->service->getRattachablesByTypePaginated(
+            $this->post,
+            TestUser::class,
+            2,
+            1
+        );
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $paginator);
+        $this->assertEquals(2, $paginator->perPage());
+        $this->assertEquals(5, $paginator->total());
+        $this->assertEquals(1, $paginator->currentPage());
+        $this->assertEquals(3, $paginator->lastPage());
+
+        // Page 2
+        $paginator2 = $this->service->getRattachablesByTypePaginated(
+            $this->post,
+            TestUser::class,
+            2,
+            2
+        );
+
+        $this->assertEquals(2, $paginator2->perPage());
+        $this->assertEquals(2, $paginator2->currentPage());
+    }
+
+    public function test_get_rattachables_by_type_and_role_returns_filtered_collection(): void
+    {
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+        $this->service->attach($user2, $this->post, Role::ADMIN);
+
+        // Récupérer les TestUser avec rôle DOCTOR
+        $rattachables = $this->service->getRattachablesByTypeAndRole(
+            $this->post,
+            TestUser::class,
+            Role::DOCTOR
+        );
+
+        $this->assertCount(1, $rattachables);
+        $this->assertEquals($this->user->id, $rattachables->first()->id);
+    }
+
+    public function test_get_rattachables_by_type_and_roles_returns_filtered_collection(): void
+    {
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+        $this->service->attach($user2, $this->post, Role::ADMIN);
+
+        // Récupérer les TestUser avec rôle DOCTOR ou ADMIN
+        $rattachables = $this->service->getRattachablesByTypeAndRoles(
+            $this->post,
+            TestUser::class,
+            [Role::DOCTOR, Role::ADMIN]
+        );
+
+        $this->assertCount(2, $rattachables);
+    }
+
+    // ✅ CORRIGÉ : Utiliser TestUser au lieu de TestCheckPoint
+    public function test_get_rattachables_by_types_and_roles_returns_filtered_collection(): void
+    {
+        $user2 = TestUser::create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+        $this->service->attach($user2, $this->post, Role::ADMIN);
+
+        // Récupérer les TestUser avec rôle DOCTOR ou ADMIN
+        $rattachables = $this->service->getRattachablesByTypesAndRoles(
+            $this->post,
+            [TestUser::class],
+            [Role::DOCTOR, Role::ADMIN]
+        );
+
+        $this->assertCount(2, $rattachables);
+        $this->assertContains($this->user->id, $rattachables->pluck('id')->toArray());
+        $this->assertContains($user2->id, $rattachables->pluck('id')->toArray());
+    }
+
     public function test_get_targets_returns_collection(): void
     {
         $post2 = TestPost::create([

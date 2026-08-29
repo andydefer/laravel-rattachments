@@ -29,7 +29,7 @@ final class TestCircularUser extends Model implements RattachmentInterface
     {
         return [
             // Circularité avec TestCircularHospital avec le même rôle CHIEF
-            TestCircularHospital::class => [Role::CHIEF, Role::DOCTOR],
+            TestCircularHospital::class => [Role::DOCTOR],
             // Circularité avec TestCircularSpecialty avec le même rôle PRIMARY
             TestCircularSpecialty::class => [Role::PRIMARY],
         ];

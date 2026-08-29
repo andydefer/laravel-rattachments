@@ -238,6 +238,122 @@ final class RattachmentService implements RattachmentServiceInterface
     /**
      * {@inheritDoc}
      */
+    public function getRattachablesByType(Model&RattachmentInterface $target, string $rattachableClass): Collection
+    {
+        $filter = RattachmentFilterRecord::from([
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+            'rattachable_type' => $rattachableClass,
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        return $rattachments->map(fn ($rattachment) => $rattachment->rattachable);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getRattachablesByTypePaginated(
+        Model&RattachmentInterface $target,
+        string $rattachableClass,
+        int $perPage = 15,
+        int $page = 1
+    ): LengthAwarePaginator {
+        $filter = RattachmentFilterRecord::from([
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+            'rattachable_type' => $rattachableClass,
+        ]);
+
+        $paginateRecord = new PaginateRecord(
+            perPage: $perPage,
+            page: $page,
+            filters: $filter,
+        );
+
+        return $this->repository->paginate($paginateRecord);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getRattachablesByTypeAndRole(
+        Model&RattachmentInterface $target,
+        string $rattachableClass,
+        EnumerableInterface $role
+    ): Collection {
+        $filter = RattachmentFilterRecord::from([
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+            'rattachable_type' => $rattachableClass,
+            'role' => $role,
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        return $rattachments->map(fn ($rattachment) => $rattachment->rattachable);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getRattachablesByTypeAndRoles(
+        Model&RattachmentInterface $target,
+        string $rattachableClass,
+        array $roles
+    ): Collection {
+        $filter = RattachmentFilterRecord::from([
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+            'rattachable_type' => $rattachableClass,
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        $roleValues = array_map(fn ($role) => $role->getValue(), $roles);
+
+        return $rattachments
+            ->filter(fn ($rattachment) => in_array($rattachment->role?->getValue(), $roleValues, true))
+            ->map(fn ($rattachment) => $rattachment->rattachable);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getRattachablesByTypesAndRoles(
+        Model&RattachmentInterface $target,
+        array $rattachableClasses,
+        array $roles
+    ): Collection {
+        $filter = RattachmentFilterRecord::from([
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+        ]);
+
+        $findByRecord = new FindByRecord(filters: $filter);
+
+        $rattachments = $this->repository->findBy($findByRecord);
+
+        $roleValues = array_map(fn ($role) => $role->getValue(), $roles);
+
+        return $rattachments
+            ->filter(
+                fn ($rattachment) => in_array($rattachment->rattachable_type, $rattachableClasses, true)
+                    && in_array($rattachment->role?->getValue(), $roleValues, true)
+            )
+            ->map(fn ($rattachment) => $rattachment->rattachable);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function getRattachablesPaginated(Model&RattachmentInterface $target, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
         $filter = RattachmentFilterRecord::from([
