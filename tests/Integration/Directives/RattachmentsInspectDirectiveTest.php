@@ -244,6 +244,62 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('TestConstrainedUser → TestUser', $response->output);
     }
 
+    public function test_inspect_ignore_missing_flag_hides_missing_connections(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] --connections --ignore-missing'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔗 EXISTING CONNECTIONS', $response->output);
+        $this->assertStringContainsString('TestConstrainedUser', $response->output);
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringNotContainsString('Possible missing connections', $response->output);
+        $this->assertStringNotContainsString('Constraint defined but no connections found', $response->output);
+        $this->assertStringContainsString('Missing connections suggestions hidden', $response->output);
+    }
+
+    public function test_inspect_ignore_missing_with_both_flags(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] --connections --constraints --ignore-missing'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔒 CONSTRAINTS', $response->output);
+        $this->assertStringContainsString('🔗 EXISTING CONNECTIONS', $response->output);
+        $this->assertStringNotContainsString('Possible missing connections', $response->output);
+        $this->assertStringContainsString('Missing connections suggestions hidden', $response->output);
+    }
+
+    public function test_inspect_ignore_missing_only_with_connections(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] --connections --ignore-missing'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔗 EXISTING CONNECTIONS', $response->output);
+        $this->assertStringNotContainsString('🔒 CONSTRAINTS', $response->output);
+        $this->assertStringNotContainsString('Possible missing connections', $response->output);
+        $this->assertStringContainsString('Missing connections suggestions hidden', $response->output);
+    }
+
+    public function test_inspect_ignore_missing_does_not_affect_constraints(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestConstrainedUser] --constraints --ignore-missing'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔒 CONSTRAINTS', $response->output);
+        $this->assertStringContainsString('TestConstrainedUser', $response->output);
+        $this->assertStringContainsString('TestPost', $response->output);
+        $this->assertStringNotContainsString('🔗 EXISTING CONNECTIONS', $response->output);
+        $this->assertStringNotContainsString('Possible missing connections', $response->output);
+        $this->assertStringNotContainsString('Missing connections suggestions hidden', $response->output);
+    }
+
     public function test_inspect_handles_missing_table_gracefully(): void
     {
         Schema::dropIfExists('rattachments');
@@ -508,5 +564,20 @@ final class RattachmentsInspectDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('Possible missing connections', $response->output);
         $this->assertStringContainsString('TestSpecializedUser → TestUser', $response->output);
         $this->assertStringContainsString('Constraint defined but no connections found', $response->output);
+    }
+
+    public function test_inspect_ignore_missing_for_specialized_user_hides_missing(): void
+    {
+        $response = $this->service->run(
+            'rattachments:inspect [AndyDefer.LaravelRattachments.Tests.Fixtures.Models.TestSpecializedUser] --connections --ignore-missing'
+        );
+
+        $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('🔗 EXISTING CONNECTIONS', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestHospital', $response->output);
+        $this->assertStringContainsString('TestSpecializedUser → TestSpecialty', $response->output);
+        $this->assertStringNotContainsString('Possible missing connections', $response->output);
+        $this->assertStringNotContainsString('TestSpecializedUser → TestUser', $response->output);
+        $this->assertStringContainsString('Missing connections suggestions hidden', $response->output);
     }
 }

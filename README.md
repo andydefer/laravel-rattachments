@@ -1369,34 +1369,37 @@ public function becomeFriendWith(User $friend): void
 
 ```bash
 # Inspecter un modèle spécifique
-php artisan rattachments:inspect [App.Models.User] --constraints
+bin/app rattachments:inspect [App.Models.User] --constraints
 
 # Inspecter plusieurs modèles
-php artisan rattachments:inspect [App.Models.User, App.Models.Hospital]
+bin/app rattachments:inspect [App.Models.User, App.Models.Hospital]
 
 # Afficher uniquement les connexions
-php artisan rattachments:inspect [App.Models.User] --connections
+bin/app rattachments:inspect [App.Models.User] --connections
 
 # Afficher uniquement les contraintes
-php artisan rattachments:inspect [App.Models.User] --constraints
+bin/app rattachments:inspect [App.Models.User] --constraints
+
+# Masquer les suggestions de relations manquantes
+bin/app rattachments:inspect [App.Models.User] --ignore-missing
 
 # Utiliser des alias
-php artisan ri [App.Models.User] --constraints
+bin/app ri [App.Models.User] --constraints
 
 # Détecter les circularités entre modèles
-php artisan rattachments:circularity [App.Models.User] [App.Models.Profile]
+bin/app rattachments:circularity [App.Models.User] [App.Models.Profile]
 
 # Détecter les circularités entre plusieurs modèles
-php artisan rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital]
+bin/app rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital]
 
 # Ignorer les messages "Skipped" (same class, n'implémente pas l'interface)
-php artisan rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital] --ignore-skipped
+bin/app rattachments:circularity [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital] --ignore-skipped
 
 # Utiliser des alias pour la détection de circularité
-php artisan rc [App.Models.User] [App.Models.Profile]
+bin/app rc [App.Models.User] [App.Models.Profile]
 
 # Utiliser l'alias avec le flag --ignore-skipped
-php artisan rc [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital] --ignore-skipped
+bin/app rc [App.Models.User, App.Models.Doctor] [App.Models.Profile, App.Models.Hospital] --ignore-skipped
 ```
 
 ### Exemple de sortie - `rattachments:inspect`
@@ -1447,6 +1450,54 @@ editor                                                       : 4
 💡 Possible missing connections (based on constraints):
 
 User → Specialty                                               : ⚠️ Constraint defined but no connections found
+
+✅ Inspection completed
+```
+
+### Exemple de sortie - `rattachments:inspect` avec `--ignore-missing`
+
+```
+🔍 Inspecting rattachments...
+
+═════════════════════════════════════════════════════════════
+  🔒 CONSTRAINTS
+═════════════════════════════════════════════════════════════
+
+📦 User
+   FQCN: App\Models\User
+   ✅ Allowed targets:
+Hospital                                                     : doctor, staff, admin
+Pharmacy                                                     : pharmacist, staff
+   🔒 Unique targets:
+Hospital                                                     : one-to-one (any role)
+Specialty                                                    : one-to-one (roles: primary)
+   🚫 Disallowed targets:
+Post                                                         : 🚫 Roles: reviewer
+
+═════════════════════════════════════════════════════════════
+  🔗 EXISTING CONNECTIONS
+═════════════════════════════════════════════════════════════
+
+📊 Found 3 connection types:
+
+User → Hospital                                                : 5x
+User → Pharmacy                                                : 3x
+User → Post                                                    : 12x
+
+📋 Roles by connection:
+
+   User → Hospital:
+doctor                                                       : 3
+staff                                                        : 2
+
+   User → Pharmacy:
+pharmacist                                                   : 3
+
+   User → Post:
+author                                                       : 8
+editor                                                       : 4
+
+ℹ️  Missing connections suggestions hidden (use without --ignore-missing to see them)
 
 ✅ Inspection completed
 ```
@@ -1513,7 +1564,17 @@ User → Specialty                                               : ⚠️ Constr
 ✅ Circularity check completed
 ```
 
-### Options de la commande `rattachments:circularity`
+### Options des commandes
+
+#### `rattachments:inspect`
+
+| Option | Description |
+|--------|-------------|
+| `--constraints` | Affiche uniquement les contraintes (`allowedTargets`, `uniqueTargets`, `disallowedTargets`) |
+| `--connections` | Affiche uniquement les connexions existantes en base |
+| `--ignore-missing` | Masque les suggestions de relations manquantes |
+
+#### `rattachments:circularity`
 
 | Option | Description |
 |--------|-------------|

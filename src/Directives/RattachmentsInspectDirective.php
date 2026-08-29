@@ -29,6 +29,9 @@ use Illuminate\Support\Facades\DB;
  *
  * // Show only connections
  * ./bin/app rattachments:inspect [App.Models.User] --connections
+ *
+ * // Hide missing connections suggestions
+ * ./bin/app rattachments:inspect [App.Models.User] --ignore-missing
  */
 final class RattachmentsInspectDirective extends AbstractDirective
 {
@@ -43,7 +46,8 @@ final class RattachmentsInspectDirective extends AbstractDirective
         return 'rattachments:inspect 
                 {models*}#"List of models to inspect (e.g., [App.Models.User, App.Models.Hospital])"
                 {--connections}#"Show existing connections in database"
-                {--constraints}#"Show model constraints only"';
+                {--constraints}#"Show model constraints only"
+                {--ignore-missing}#"Hide missing connections suggestions"';
     }
 
     public function getDescription(): string
@@ -73,6 +77,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
 
         $showConnections = $this->getFlag('connections');
         $showConstraints = $this->getFlag('constraints');
+        $ignoreMissing = $this->getFlag('ignore-missing');
 
         if (! $showConnections && ! $showConstraints) {
             $showConnections = true;
@@ -86,7 +91,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
         }
 
         if ($showConnections) {
-            $this->displayConnections($constrainedModels);
+            $this->displayConnections($constrainedModels, $ignoreMissing);
         }
 
         $this->newLine();
@@ -300,7 +305,7 @@ final class RattachmentsInspectDirective extends AbstractDirective
         return "⚠️ Allowed: {$allowedLabels} | Disallowed: {$disallowedLabels} → DISALLOW WINS";
     }
 
-    private function displayConnections(array $constrainedModels): void
+    private function displayConnections(array $constrainedModels, bool $ignoreMissing): void
     {
         $this->renderSectionHeader(self::CONNECTION_SECTION);
 
@@ -331,8 +336,14 @@ final class RattachmentsInspectDirective extends AbstractDirective
 
         $this->renderConnectionsSummary($connections);
         $this->renderRolesByConnection($connections);
-        $this->newLine();
-        $this->displayMissingConnectionsSuggestions($connections, $constrainedModels);
+
+        if (! $ignoreMissing) {
+            $this->newLine();
+            $this->displayMissingConnectionsSuggestions($connections, $constrainedModels);
+        } else {
+            $this->newLine();
+            $this->info('ℹ️  Missing connections suggestions hidden (use without --ignore-missing to see them)');
+        }
     }
 
     private function extractModelClassesWithInterface(array $constrainedModels): array
