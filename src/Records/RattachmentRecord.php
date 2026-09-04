@@ -13,9 +13,9 @@ final class RattachmentRecord extends AbstractRecord
     public function __construct(
         public readonly ?int $id = null,
         public readonly ?string $rattachable_type = null,
-        public readonly ?int $rattachable_id = null,
+        public readonly ?string $rattachable_id = null,
         public readonly ?string $target_type = null,
-        public readonly ?int $target_id = null,
+        public readonly ?string $target_id = null,
         public readonly ?string $role = null,
         public readonly ?StrictDataObject $metadata = null,
         public readonly ?DateTimeVO $created_at = null,
