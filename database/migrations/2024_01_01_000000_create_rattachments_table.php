@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('rattachments', function (Blueprint $table) {
-            $table->uuid('id');
+            $table->uuid('id')->primary();
 
             $table->string('rattachable_type');
             $table->string('rattachable_id');
@@ -22,7 +22,7 @@ return new class extends Migration
 
             $table->index(['rattachable_type', 'rattachable_id']);
             $table->index(['target_type', 'target_id']);
-            $table->unique(['rattachable_type', 'rattachable_id', 'target_type', 'target_id'], 'rattachments_unique');
+
         });
     }
 
