@@ -27,10 +27,8 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     ): void {
         $this->validateSelfAttachment($rattachable, $target);
 
-        $targetClass = $target->getMorphClass();
-
-        $this->validateDisallowedTargets($rattachable, $targetClass, $role);
-        $this->validateAllowedTargets($rattachable, $targetClass, $role);
+        $this->validateDisallowedTargets($rattachable, $target, $role);
+        $this->validateAllowedTargets($rattachable, $target, $role);
         $this->validateCircularity($rattachable, $target, $role);
     }
 
@@ -41,20 +39,26 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     ): void {
         $this->validateUniqueCircularity($rattachable, $target, $role);
 
-        $uniqueTargets = $rattachable->uniqueTargets();
+        $effectiveAllowed = $this->getEffectiveAllowedTargets($rattachable);
 
-        $targetClass = $target->getMorphClass();
+        $declaredKey = $this->findMatchingDeclaredKey($effectiveAllowed, $target);
 
-        if (! array_key_exists($targetClass, $uniqueTargets)) {
+        if ($declaredKey === null) {
             return;
         }
 
-        $uniqueRoles = $uniqueTargets[$targetClass];
+        $uniqueTargets = $rattachable->uniqueTargets();
+
+        if (! $this->hasMatchingDeclaredKey($uniqueTargets, $target)) {
+            return;
+        }
+
+        $uniqueRoles = $this->findMatchingUniqueRoles($uniqueTargets, $target);
 
         $filterData = [
             'rattachable_type' => $rattachable->getMorphClass(),
             'rattachable_id' => $rattachable->getKey(),
-            'target_type' => $targetClass,
+            'target_type' => $target->getMorphClass(),
         ];
 
         if (! empty($uniqueRoles)) {
@@ -78,8 +82,8 @@ final class ConstraintValidator implements ConstraintValidatorInterface
                 throw new RuntimeException(sprintf(
                     '%s already has a unique attachment to %s. Only one %s is allowed.',
                     $rattachable->getMorphClass(),
-                    $targetClass,
-                    class_basename($targetClass)
+                    $target->getMorphClass(),
+                    class_basename($target->getMorphClass())
                 ));
             }
 
@@ -91,9 +95,9 @@ final class ConstraintValidator implements ConstraintValidatorInterface
             throw new RuntimeException(sprintf(
                 '%s already has a unique attachment to %s with role "%s". Only one %s with role %s is allowed.',
                 $rattachable->getMorphClass(),
-                $targetClass,
+                $target->getMorphClass(),
                 $role->getValue(),
-                class_basename($targetClass),
+                class_basename($target->getMorphClass()),
                 $roleLabels
             ));
         }
@@ -120,9 +124,19 @@ final class ConstraintValidator implements ConstraintValidatorInterface
 
         $effectiveAllowed = $this->getEffectiveAllowedTargets($rattachable);
 
-        $this->ensureTargetIsAllowed($effectiveAllowed, $targetClass, $rattachableClass);
+        $roles = $this->findMatchingRolesForTargetClass($effectiveAllowed, $targetClass);
 
-        foreach ($effectiveAllowed[$targetClass] as $roleEnum) {
+        if ($roles === null) {
+            $allowedTargets = array_keys($effectiveAllowed);
+            throw new RuntimeException(sprintf(
+                'Target %s is not allowed for %s. Allowed targets: %s',
+                $targetClass,
+                $rattachableClass,
+                ! empty($allowedTargets) ? implode(', ', $allowedTargets) : 'none'
+            ));
+        }
+
+        foreach ($roles as $roleEnum) {
             if ($roleEnum instanceof EnumerableInterface && $roleEnum->getValue() === $roleValue) {
                 return $roleEnum;
             }
@@ -132,12 +146,12 @@ final class ConstraintValidator implements ConstraintValidatorInterface
     }
 
     // ================================================================
-    // NOUVELLE MÉTHODE
+    // EFFECTIVE ALLOWED TARGETS (merge allowed + unique)
     // ================================================================
 
     /**
-     * Fusionne allowedTargets() et uniqueTargets() par target et par rôle.
-     * uniqueTargets() autorise implicitement les rôles qu'elle déclare.
+     * Merge allowedTargets() and uniqueTargets() by target and by role.
+     * uniqueTargets() implicitly authorizes the roles it declares.
      *
      * @return array<string, array<int, EnumerableInterface>>
      */
@@ -148,14 +162,14 @@ final class ConstraintValidator implements ConstraintValidatorInterface
 
         $result = $allowed;
 
-        foreach ($unique as $targetClass => $roles) {
-            if (! isset($result[$targetClass])) {
-                $result[$targetClass] = [];
+        foreach ($unique as $declaredKey => $roles) {
+            if (! isset($result[$declaredKey])) {
+                $result[$declaredKey] = [];
             }
 
             foreach ($roles as $role) {
-                if (! $this->isRoleInArray($role, $result[$targetClass])) {
-                    $result[$targetClass][] = $role;
+                if (! $this->isRoleInArray($role, $result[$declaredKey])) {
+                    $result[$declaredKey][] = $role;
                 }
             }
         }
@@ -163,35 +177,123 @@ final class ConstraintValidator implements ConstraintValidatorInterface
         return $result;
     }
 
+    /**
+     * Find the declared key (class or interface) matching the given target model.
+     *
+     * @param  array<string, array<int, EnumerableInterface>>  $declared
+     */
+    private function findMatchingDeclaredKey(array $declared, Model $target): ?string
+    {
+        $targetClass = $target->getMorphClass();
+
+        foreach (array_keys($declared) as $declaredKey) {
+            if ($targetClass === $declaredKey || is_a($targetClass, $declaredKey, true)) {
+                return $declaredKey;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find all matching declared keys for the given target class.
+     *
+     * @param  array<string, array<int, EnumerableInterface>>  $declared
+     * @return array<int, string>|null
+     */
+    private function findMatchingDeclaredKeysForClass(array $declared, string $targetClass): ?array
+    {
+        $matches = [];
+
+        foreach (array_keys($declared) as $declaredKey) {
+            if ($targetClass === $declaredKey || is_a($targetClass, $declaredKey, true)) {
+                $matches[] = $declaredKey;
+            }
+        }
+
+        return $matches === [] ? null : $matches;
+    }
+
+    /**
+     * Return the roles declared for the given target, resolving through inheritance.
+     *
+     * @param  array<string, array<int, EnumerableInterface>>  $declared
+     * @return array<int, EnumerableInterface>|null
+     */
+    private function findMatchingRolesForTargetClass(array $declared, string $targetClass): ?array
+    {
+        $matchingKeys = $this->findMatchingDeclaredKeysForClass($declared, $targetClass);
+
+        if ($matchingKeys === null) {
+            return null;
+        }
+
+        $roles = [];
+
+        foreach ($matchingKeys as $key) {
+            foreach ($declared[$key] as $role) {
+                if (! $this->isRoleInArray($role, $roles)) {
+                    $roles[] = $role;
+                }
+            }
+        }
+
+        return $roles;
+    }
+
+    /**
+     * Indicate whether the given target matches at least one declared key.
+     *
+     * @param  array<string, array<int, EnumerableInterface>>  $declared
+     */
+    private function hasMatchingDeclaredKey(array $declared, Model $target): bool
+    {
+        return $this->findMatchingDeclaredKey($declared, $target) !== null;
+    }
+
+    /**
+     * Return the merged roles declared for the given target in uniqueTargets().
+     *
+     * @param  array<string, array<int, EnumerableInterface>>  $uniqueTargets
+     * @return array<int, EnumerableInterface>
+     */
+    private function findMatchingUniqueRoles(array $uniqueTargets, Model $target): array
+    {
+        $roles = $this->findMatchingRolesForTargetClass($uniqueTargets, $target->getMorphClass());
+
+        return $roles ?? [];
+    }
+
     // ================================================================
-    // MÉTHODES MODIFIÉES
+    // VALIDATION
     // ================================================================
 
     private function validateAllowedTargets(
         Model&RattachmentInterface $rattachable,
-        string $targetClass,
+        Model&RattachmentInterface $target,
         EnumerableInterface $role
     ): void {
         $effectiveAllowed = $this->getEffectiveAllowedTargets($rattachable);
 
-        if (! isset($effectiveAllowed[$targetClass])) {
+        $roles = $this->findMatchingRolesForTargetClass($effectiveAllowed, $target->getMorphClass());
+
+        if ($roles === null) {
             $allowedTargets = array_keys($effectiveAllowed);
             throw new RuntimeException(sprintf(
                 '%s cannot be attached to %s. Allowed targets: %s',
                 $rattachable->getMorphClass(),
-                $targetClass,
+                $target->getMorphClass(),
                 ! empty($allowedTargets) ? implode(', ', $allowedTargets) : 'none'
             ));
         }
 
-        $allowedRoles = $effectiveAllowed[$targetClass];
-        if (! $this->isRoleInArray($role, $allowedRoles)) {
-            $allowedValues = array_map(fn ($r) => $r->getValue(), $allowedRoles);
+        if (! $this->isRoleInArray($role, $roles)) {
+            $allowedValues = array_map(fn ($r) => $r->getValue(), $roles);
             throw new RuntimeException(sprintf(
                 'Role "%s" is not allowed for %s -> %s. Allowed roles: %s',
                 $role->getValue(),
                 $rattachable->getMorphClass(),
-                $targetClass,
+                $target->getMorphClass(),
                 ! empty($allowedValues) ? implode(', ', $allowedValues) : 'none'
             ));
         }
@@ -210,10 +312,20 @@ final class ConstraintValidator implements ConstraintValidatorInterface
 
         $effectiveAllowed = $this->getEffectiveAllowedTargets($rattachable);
 
-        $this->ensureTargetIsAllowed($effectiveAllowed, $targetClass, $rattachableClass);
+        $roles = $this->findMatchingRolesForTargetClass($effectiveAllowed, $targetClass);
+
+        if ($roles === null) {
+            throw new RuntimeException(
+                sprintf(
+                    'Target %s is not allowed for %s.',
+                    $targetClass,
+                    $rattachableClass
+                )
+            );
+        }
 
         $isValid = false;
-        foreach ($effectiveAllowed[$targetClass] as $roleEnum) {
+        foreach ($roles as $roleEnum) {
             if ($roleEnum instanceof EnumerableInterface && $roleEnum->getValue() === $roleValue) {
                 $isValid = true;
                 break;
@@ -229,15 +341,48 @@ final class ConstraintValidator implements ConstraintValidatorInterface
                     $targetClass,
                     implode(', ', array_map(
                         fn ($role) => $role instanceof EnumerableInterface ? $role->getValue() : (string) $role,
-                        $effectiveAllowed[$targetClass]
+                        $roles
                     ))
                 )
             );
         }
     }
 
+    private function validateDisallowedTargets(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role
+    ): void {
+        $disallowed = $rattachable->disallowedTargets();
+
+        $roles = $this->findMatchingRolesForTargetClass($disallowed, $target->getMorphClass());
+
+        if ($roles === null) {
+            return;
+        }
+
+        if (empty($roles)) {
+            throw new RuntimeException(sprintf(
+                '%s cannot be attached to %s. This target is disallowed.',
+                $rattachable->getMorphClass(),
+                $target->getMorphClass()
+            ));
+        }
+
+        if ($this->isRoleInArray($role, $roles)) {
+            $disallowedValues = array_map(fn ($r) => $r->getValue(), $roles);
+            throw new RuntimeException(sprintf(
+                'Role "%s" is disallowed for %s -> %s. Disallowed roles: %s',
+                $role->getValue(),
+                $rattachable->getMorphClass(),
+                $target->getMorphClass(),
+                implode(', ', $disallowedValues)
+            ));
+        }
+    }
+
     // ================================================================
-    // MÉTHODES INCHANGÉES
+    // HELPERS
     // ================================================================
 
     private function isRoleInArray(EnumerableInterface $role, array $roles): bool
@@ -249,39 +394,6 @@ final class ConstraintValidator implements ConstraintValidatorInterface
         }
 
         return false;
-    }
-
-    private function validateDisallowedTargets(
-        Model&RattachmentInterface $rattachable,
-        string $targetClass,
-        EnumerableInterface $role
-    ): void {
-        $disallowed = $rattachable->disallowedTargets();
-
-        if (! array_key_exists($targetClass, $disallowed)) {
-            return;
-        }
-
-        $disallowedRoles = $disallowed[$targetClass];
-
-        if (empty($disallowedRoles)) {
-            throw new RuntimeException(sprintf(
-                '%s cannot be attached to %s. This target is disallowed.',
-                $rattachable->getMorphClass(),
-                $targetClass
-            ));
-        }
-
-        if ($this->isRoleInArray($role, $disallowedRoles)) {
-            $disallowedValues = array_map(fn ($r) => $r->getValue(), $disallowedRoles);
-            throw new RuntimeException(sprintf(
-                'Role "%s" is disallowed for %s -> %s. Disallowed roles: %s',
-                $role->getValue(),
-                $rattachable->getMorphClass(),
-                $targetClass,
-                implode(', ', $disallowedValues)
-            ));
-        }
     }
 
     private function ensureRattachableClassExists(string $rattachableClass): void
@@ -303,22 +415,6 @@ final class ConstraintValidator implements ConstraintValidatorInterface
                     'Rattachable model %s must implement %s.',
                     $rattachableClass,
                     RattachmentInterface::class
-                )
-            );
-        }
-    }
-
-    private function ensureTargetIsAllowed(
-        array $effectiveAllowed,
-        string $targetClass,
-        string $rattachableClass
-    ): void {
-        if (! isset($effectiveAllowed[$targetClass])) {
-            throw new RuntimeException(
-                sprintf(
-                    'Target %s is not allowed for %s.',
-                    $targetClass,
-                    $rattachableClass
                 )
             );
         }
@@ -347,27 +443,23 @@ final class ConstraintValidator implements ConstraintValidatorInterface
             return;
         }
 
-        // ✅ Utiliser la fusion allowedTargets() + uniqueTargets() du target
         $targetAllowed = $this->getEffectiveAllowedTargets($target);
 
-        $rattachableClass = $rattachable->getMorphClass();
-        $targetClass = $target->getMorphClass();
+        $roles = $this->findMatchingRolesForTargetClass($targetAllowed, $rattachable->getMorphClass());
 
-        if (! isset($targetAllowed[$rattachableClass])) {
+        if ($roles === null) {
             return;
         }
 
-        $targetAllowedRoles = $targetAllowed[$rattachableClass];
-
-        if (in_array($role, $targetAllowedRoles, true)) {
+        if ($this->isRoleInArray($role, $roles)) {
             throw new RuntimeException(sprintf(
                 'Circular relationship detected: %s → %s with role "%s" and %s → %s with the same role. '
                 .'To avoid circular references, define the relationship in only one direction.',
-                $rattachableClass,
-                $targetClass,
+                $rattachable->getMorphClass(),
+                $target->getMorphClass(),
                 $role->getValue(),
-                $targetClass,
-                $rattachableClass
+                $target->getMorphClass(),
+                $rattachable->getMorphClass()
             ));
         }
     }
@@ -381,26 +473,23 @@ final class ConstraintValidator implements ConstraintValidatorInterface
             return;
         }
 
-        $targetUniqueTargets = $target->uniqueTargets();
+        $targetUnique = $target->uniqueTargets();
 
-        $rattachableClass = $rattachable->getMorphClass();
-        $targetClass = $target->getMorphClass();
+        $roles = $this->findMatchingRolesForTargetClass($targetUnique, $rattachable->getMorphClass());
 
-        if (! isset($targetUniqueTargets[$rattachableClass])) {
+        if ($roles === null) {
             return;
         }
 
-        $targetUniqueRoles = $targetUniqueTargets[$rattachableClass];
-
-        if (empty($targetUniqueRoles) || in_array($role, $targetUniqueRoles, true)) {
+        if (empty($roles) || $this->isRoleInArray($role, $roles)) {
             throw new RuntimeException(sprintf(
                 'Circular unique constraint detected: %s → %s with role "%s" and %s → %s with the same role. '
                 .'This creates a circular dependency. Define the unique constraint in only one direction.',
-                $rattachableClass,
-                $targetClass,
+                $rattachable->getMorphClass(),
+                $target->getMorphClass(),
                 $role->getValue(),
-                $targetClass,
-                $rattachableClass
+                $target->getMorphClass(),
+                $rattachable->getMorphClass()
             ));
         }
     }
