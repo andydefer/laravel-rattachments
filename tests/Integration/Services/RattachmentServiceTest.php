@@ -83,14 +83,40 @@ final class RattachmentServiceTest extends IntegrationTestCase
         ]);
     }
 
-    public function test_attach_throws_exception_when_already_attached(): void
+    public function test_attach_allows_same_pair_with_different_roles(): void
     {
+        // Arrange: attach the pair with a first role
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
 
+        // Act: attach the same pair with a different role
+        $attachment = $this->service->attach($this->user, $this->post, Role::ADMIN);
+
+        // Assert: both attachments coexist
+        $this->assertInstanceOf(Rattachment::class, $attachment);
+        $this->assertEquals(Role::ADMIN, $attachment->role);
+        $this->assertDatabaseCount('rattachments', 2);
+    }
+
+    public function test_attach_throws_exception_when_same_role_already_attached(): void
+    {
+        // Arrange: attach the pair with the DOCTOR role
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+
+        // Act & Assert: attaching the same role again raises an exception
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('is already attached to');
 
-        $this->service->attach($this->user, $this->post, Role::ADMIN);
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+    }
+
+    public function test_is_attached_with_role_returns_true_for_existing_role_only(): void
+    {
+        // Arrange: attach the pair with the DOCTOR role
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+
+        // Act & Assert: the DOCTOR role is present, ADMIN is not
+        $this->assertTrue($this->service->isAttachedWithRole($this->user, $this->post, Role::DOCTOR));
+        $this->assertFalse($this->service->isAttachedWithRole($this->user, $this->post, Role::ADMIN));
     }
 
     public function test_attach_multiple_creates_multiple_attachments(): void
@@ -234,6 +260,15 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertFalse($this->service->isAttached($this->user, $this->post));
     }
 
+    public function test_is_attached_returns_true_regardless_of_role(): void
+    {
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+
+        $this->assertTrue($this->service->isAttached($this->user, $this->post));
+        $this->assertTrue($this->service->isAttachedWithRole($this->user, $this->post, Role::DOCTOR));
+        $this->assertFalse($this->service->isAttachedWithRole($this->user, $this->post, Role::ADMIN));
+    }
+
     public function test_has_role_attached_returns_true_when_role_exists(): void
     {
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
@@ -259,7 +294,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertContains($user2->id, $rattachables->pluck('id')->toArray());
     }
 
-    // ✅ CORRIGÉ : Utiliser TestUser au lieu de TestCheckPoint
     public function test_get_rattachables_by_type_returns_filtered_collection(): void
     {
         $user2 = TestUser::create([
@@ -270,7 +304,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
         $this->service->attach($user2, $this->post, Role::ADMIN);
 
-        // Récupérer uniquement les TestUser attachés au post
         $rattachables = $this->service->getRattachablesByType(
             $this->post,
             TestUser::class
@@ -280,7 +313,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertContains($this->user->id, $rattachables->pluck('id')->toArray());
         $this->assertContains($user2->id, $rattachables->pluck('id')->toArray());
 
-        // Vérifier que les deux sont bien des TestUser
         foreach ($rattachables as $rattachable) {
             $this->assertInstanceOf(TestUser::class, $rattachable);
         }
@@ -288,7 +320,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
     public function test_get_rattachables_by_type_paginated_returns_paginated_results(): void
     {
-        // Créer 5 utilisateurs attachés au post
         for ($i = 1; $i <= 5; $i++) {
             $user = TestUser::create([
                 'name' => "User {$i}",
@@ -297,7 +328,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             $this->service->attach($user, $this->post, Role::DOCTOR);
         }
 
-        // Pagination : 2 par page, page 1
         $paginator = $this->service->getRattachablesByTypePaginated(
             $this->post,
             TestUser::class,
@@ -311,7 +341,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertEquals(1, $paginator->currentPage());
         $this->assertEquals(3, $paginator->lastPage());
 
-        // Page 2
         $paginator2 = $this->service->getRattachablesByTypePaginated(
             $this->post,
             TestUser::class,
@@ -333,7 +362,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
         $this->service->attach($user2, $this->post, Role::ADMIN);
 
-        // Récupérer les TestUser avec rôle DOCTOR
         $rattachables = $this->service->getRattachablesByTypeAndRole(
             $this->post,
             TestUser::class,
@@ -354,7 +382,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
         $this->service->attach($user2, $this->post, Role::ADMIN);
 
-        // Récupérer les TestUser avec rôle DOCTOR ou ADMIN
         $rattachables = $this->service->getRattachablesByTypeAndRoles(
             $this->post,
             TestUser::class,
@@ -364,7 +391,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertCount(2, $rattachables);
     }
 
-    // ✅ CORRIGÉ : Utiliser TestUser au lieu de TestCheckPoint
     public function test_get_rattachables_by_types_and_roles_returns_filtered_collection(): void
     {
         $user2 = TestUser::create([
@@ -375,7 +401,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
         $this->service->attach($user2, $this->post, Role::ADMIN);
 
-        // Récupérer les TestUser avec rôle DOCTOR ou ADMIN
         $rattachables = $this->service->getRattachablesByTypesAndRoles(
             $this->post,
             [TestUser::class],
@@ -529,7 +554,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $post, Role::DOCTOR);
         $this->service->attach($this->user, $post2, Role::ADMIN);
 
-        // Récupérer les TestPost avec rôle DOCTOR
         $targets = $this->service->getTargetsByTypeAndRole(
             $this->user,
             TestPost::class,
@@ -557,7 +581,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $post, Role::DOCTOR);
         $this->service->attach($this->user, $post2, Role::ADMIN);
 
-        // Récupérer les TestPost avec rôle DOCTOR ou ADMIN
         $targets = $this->service->getTargetsByTypeAndRoles(
             $this->user,
             TestPost::class,
@@ -583,7 +606,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $post, Role::DOCTOR);
         $this->service->attach($this->user, $user2, Role::ADMIN);
 
-        // Récupérer les TestPost et TestUser avec rôle DOCTOR
         $targets = $this->service->getTargetsByTypesAndRoles(
             $this->user,
             [TestPost::class, TestUser::class],
@@ -593,10 +615,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertCount(1, $targets);
         $this->assertEquals($post->id, $targets->first()->id);
     }
-
-    // ============================================================
-    // GET TARGETS BY TYPE TESTS
-    // ============================================================
 
     public function test_get_targets_by_type_returns_filtered_collection(): void
     {
@@ -611,33 +629,27 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'email' => 'jane@example.com',
         ]);
 
-        // Attacher à différents types
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
         $this->service->attach($this->user, $post2, Role::ADMIN);
         $this->service->attach($this->user, $user2, Role::STAFF);
 
-        // Récupérer uniquement les TestPost
         $targets = $this->service->getTargetsByType($this->user, TestPost::class);
 
         $this->assertCount(2, $targets);
 
-        // Vérifier que tous les targets sont des TestPost
         foreach ($targets as $target) {
             $this->assertInstanceOf(TestPost::class, $target);
         }
 
-        // Vérifier la présence des IDs des posts
         $targetIds = $targets->pluck('id')->toArray();
         $this->assertContains($this->post->id, $targetIds);
         $this->assertContains($post2->id, $targetIds);
 
-        // Vérifier qu'aucun TestUser n'est dans la collection
         $this->assertFalse($targets->contains(fn ($target) => $target instanceof TestUser));
     }
 
     public function test_get_targets_by_type_returns_empty_collection_when_no_targets(): void
     {
-        // Aucun rattachement créé
         $targets = $this->service->getTargetsByType($this->user, TestPost::class);
 
         $this->assertCount(0, $targets);
@@ -646,7 +658,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
     public function test_get_targets_by_type_with_pagination_returns_paginated_results(): void
     {
-        // Créer 5 posts
         for ($i = 1; $i <= 5; $i++) {
             $post = TestPost::create([
                 'user_id' => $this->user->id,
@@ -656,7 +667,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             $this->service->attach($this->user, $post, Role::DOCTOR);
         }
 
-        // Pagination : 2 par page, page 1
         $paginator = $this->service->getTargetsByTypePaginated(
             $this->user,
             TestPost::class,
@@ -670,7 +680,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->assertEquals(1, $paginator->currentPage());
         $this->assertEquals(3, $paginator->lastPage());
 
-        // Page 2
         $paginator2 = $this->service->getTargetsByTypePaginated(
             $this->user,
             TestPost::class,
@@ -698,12 +707,10 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->attach($this->user, $post, Role::DOCTOR);
         $this->service->attach($this->user, $user2, Role::ADMIN);
 
-        // Récupérer les TestPost
         $posts = $this->service->getTargetsByType($this->user, TestPost::class);
         $this->assertCount(1, $posts);
         $this->assertEquals($post->id, $posts->first()->id);
 
-        // Récupérer les TestUser
         $users = $this->service->getTargetsByType($this->user, TestUser::class);
         $this->assertCount(1, $users);
         $this->assertEquals($user2->id, $users->first()->id);
@@ -728,16 +735,13 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'Second content',
         ]);
 
-        // Attacher le premier post
         $this->service->attach($constrainedUser, $post1, Role::DOCTOR);
 
-        // Récupérer les targets
         $targets = $this->service->getTargetsByType($constrainedUser, TestPost::class);
 
         $this->assertCount(1, $targets);
         $this->assertEquals($post1->id, $targets->first()->id);
 
-        // Essayer d'attacher un deuxième post (devrait échouer à cause de la contrainte unique)
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already has a unique attachment to');
 
@@ -923,7 +927,7 @@ final class RattachmentServiceTest extends IntegrationTestCase
                 'metadata' => ['updated' => true],
             ],
             [
-                'target' => $post2, // On garde post2, pas user2
+                'target' => $post2,
                 'role' => Role::DOCTOR,
             ],
         ];
@@ -932,19 +936,55 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
         $this->assertCount(2, $results);
 
-        // Vérifier que post2 est toujours attaché (avec le nouveau rôle)
-        $this->assertTrue($this->service->isAttached($this->user, $post2));
+        // Vérifier que post a maintenant le rôle ADMIN (créé car absent pour ce rôle)
+        $this->assertTrue(
+            $this->service->isAttachedWithRole($this->user, $this->post, Role::ADMIN),
+        );
 
-        // Vérifier que post a été mis à jour
-        $attachment = $this->service->getAttachment($this->user, $this->post);
-        $this->assertNotNull($attachment);
-        $this->assertEquals(Role::ADMIN, $attachment->role);
-        $this->assertEquals(['updated' => true], $this->getMetadataArray($attachment));
+        // Vérifier que post2 a maintenant le rôle DOCTOR (créé car absent pour ce rôle)
+        $this->assertTrue(
+            $this->service->isAttachedWithRole($this->user, $post2, Role::DOCTOR),
+        );
 
-        // Vérifier que post2 a été mis à jour
-        $attachment2 = $this->service->getAttachment($this->user, $post2);
-        $this->assertNotNull($attachment2);
-        $this->assertEquals(Role::DOCTOR, $attachment2->role);
+        // Vérifier que post2 conserve aussi son rôle ADMIN
+        $this->assertTrue(
+            $this->service->isAttachedWithRole($this->user, $post2, Role::ADMIN),
+        );
+    }
+
+    public function test_sync_attachments_updates_metadata_when_role_exists(): void
+    {
+        // Arrange: attach the pair with the DOCTOR role and initial metadata
+        $this->service->attach($this->user, $this->post, Role::DOCTOR, ['initial' => true]);
+
+        // Act: sync the same pair with the same role and new metadata
+        $this->service->syncAttachments($this->user, [
+            [
+                'target' => $this->post,
+                'role' => Role::DOCTOR,
+                'metadata' => ['updated' => true],
+            ],
+        ]);
+
+        // Assert: only one attachment exists and metadata has been refreshed
+        $this->assertDatabaseCount('rattachments', 1);
+        $this->assertEquals(['updated' => true], $this->getMetadataArray(
+            $this->service->getAttachment($this->user, $this->post),
+        ));
+    }
+
+    public function test_sync_attachments_does_not_duplicate_same_role(): void
+    {
+        // Arrange: attach a pair with DOCTOR, then sync with DOCTOR again
+        $this->service->attach($this->user, $this->post, Role::DOCTOR);
+
+        // Act: sync with the same (target, role) pair
+        $this->service->syncAttachments($this->user, [
+            ['target' => $this->post, 'role' => Role::DOCTOR],
+        ]);
+
+        // Assert: no duplicate created for the same (target, role) pair
+        $this->assertDatabaseCount('rattachments', 1);
     }
 
     public function test_has_attachments_between_types(): void
@@ -956,7 +996,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
         $this->service->attach($this->user, $this->post, Role::DOCTOR);
 
-        // ✅ Vrai : il existe un attachment entre TestUser et TestPost
         $this->assertTrue(
             $this->service->hasAttachmentsBetweenTypes(
                 $this->user->getMorphClass(),
@@ -964,8 +1003,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             )
         );
 
-        // ✅ Vrai aussi : il existe un attachment entre TestUser et TestPost
-        // (peu importe quel TestUser et quel TestPost)
         $this->assertTrue(
             $this->service->hasAttachmentsBetweenTypes(
                 $user2->getMorphClass(),
@@ -1094,10 +1131,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
         $this->service->syncAttachments($constrainedUser, $targets);
     }
 
-    // ============================================================
-    // UNIQUE CONSTRAINTS TESTS
-    // ============================================================
-
     public function test_attach_with_unique_constraint_allows_single_attachment(): void
     {
         $constrainedUser = TestConstrainedUser::create([
@@ -1111,7 +1144,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'First content',
         ]);
 
-        // ✅ Premier rattachement autorisé
         $attachment = $this->service->attach(
             $constrainedUser,
             $post,
@@ -1141,10 +1173,8 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'Second content',
         ]);
 
-        // ✅ Premier rattachement autorisé
         $this->service->attach($constrainedUser, $post1, Role::DOCTOR);
 
-        // ❌ Deuxième rattachement vers le même type de target → Exception
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already has a unique attachment to');
 
@@ -1169,10 +1199,8 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'email' => 'another@example.com',
         ]);
 
-        // ✅ Rattachement vers TestPost autorisé
         $this->service->attach($constrainedUser, $post, Role::DOCTOR);
 
-        // ✅ Rattachement vers TestUser (target différent) autorisé
         $attachment = $this->service->attach($constrainedUser, $user2, Role::ADMIN);
 
         $this->assertInstanceOf(Rattachment::class, $attachment);
@@ -1198,10 +1226,8 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'Second content',
         ]);
 
-        // Premier rattachement autorisé
         $this->service->attach($constrainedUser, $post1, Role::DOCTOR);
 
-        // ❌ Sync avec deux TestPost → Exception
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already has a unique attachment to');
 
@@ -1232,7 +1258,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
         $this->service->attach($constrainedUser, $post, Role::DOCTOR);
 
-        // ✅ Mise à jour du rôle autorisée (ne crée pas de nouveau rattachement)
         $this->service->updateRole($constrainedUser, $post, Role::ADMIN);
 
         $attachment = $this->service->getAttachment($constrainedUser, $post);
@@ -1241,7 +1266,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
     public function test_unique_constraint_does_not_affect_models_without_interface(): void
     {
-        // TestUser n'implémente pas RattachmentInterface
         $user = TestUser::create([
             'name' => 'Normal User',
             'email' => 'normal@example.com',
@@ -1259,19 +1283,13 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'Second content',
         ]);
 
-        // ✅ Rattachement autorisé
         $this->service->attach($user, $post1, Role::DOCTOR);
 
-        // ✅ Deuxième rattachement autorisé (pas de contrainte unique)
         $attachment = $this->service->attach($user, $post2, Role::ADMIN);
 
         $this->assertInstanceOf(Rattachment::class, $attachment);
         $this->assertEquals(Role::ADMIN, $attachment->role);
     }
-
-    // ============================================================
-    // DISALLOWED CONSTRAINTS TESTS
-    // ============================================================
 
     public function test_attach_with_disallowed_target_throws_exception(): void
     {
@@ -1334,11 +1352,9 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'is_active' => true,
         ]);
 
-        // ✅ Attacher à Post (autorisé) → OK
         $attachment = $this->service->attach($disallowedUser, $post, Role::DOCTOR);
         $this->assertInstanceOf(Rattachment::class, $attachment);
 
-        // ❌ Attacher à Checkpoint (disallowed) → Exception
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('cannot be attached to');
 
@@ -1364,10 +1380,8 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'is_active' => true,
         ]);
 
-        // ✅ Premier rattachement autorisé
         $this->service->attach($disallowedUser, $post, Role::DOCTOR);
 
-        // ❌ Sync avec Checkpoint (disallowed) → Exception
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('cannot be attached to');
 
@@ -1396,7 +1410,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'Test content',
         ]);
 
-        // ❌ STAFF est disallowed pour TestPost
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Role "staff" is disallowed for');
 
@@ -1422,11 +1435,9 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'body' => 'Test content',
         ]);
 
-        // ✅ DOCTOR est autorisé pour TestPost
         $attachment = $this->service->attach($disallowedUser, $post, Role::DOCTOR);
         $this->assertInstanceOf(Rattachment::class, $attachment);
 
-        // ✅ ADMIN est autorisé pour TestPost (post différent)
         $attachment2 = $this->service->attach($disallowedUser, $post2, Role::ADMIN);
         $this->assertInstanceOf(Rattachment::class, $attachment2);
     }
@@ -1444,7 +1455,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'is_active' => true,
         ]);
 
-        // ❌ Checkpoint est totalement disallowed ([]), priorité sur le rôle
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('cannot be attached to');
 
@@ -1463,7 +1473,6 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'email' => 'jane@example.com',
         ]);
 
-        // ❌ ADMIN est disallowed pour TestUser
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Role "admin" is disallowed for');
 
@@ -1482,14 +1491,12 @@ final class RattachmentServiceTest extends IntegrationTestCase
             'email' => 'jane@example.com',
         ]);
 
-        // ✅ DOCTOR est autorisé pour TestUser
         $attachment = $this->service->attach($disallowedUser, $user2, Role::DOCTOR);
         $this->assertInstanceOf(Rattachment::class, $attachment);
     }
 
     public function test_no_n_plus_one_with_fixed_role_accessor(): void
     {
-        // Arrange
         $post = TestPost::create([
             'user_id' => 1,
             'title' => 'Test Post',
@@ -1507,15 +1514,12 @@ final class RattachmentServiceTest extends IntegrationTestCase
 
         DB::enableQueryLog();
 
-        // Act
         $attachments = Rattachment::all();
-        // 1 requête : SELECT * FROM rattachments
 
         foreach ($attachments as $attachment) {
-            $role = $attachment->role; // ✅ 0 requête : instanciation directe
+            $role = $attachment->role;
         }
 
-        // Assert
-        $this->assertCount(1, DB::getQueryLog()); // ✅ Seulement la requête SELECT
+        $this->assertCount(1, DB::getQueryLog());
     }
 }

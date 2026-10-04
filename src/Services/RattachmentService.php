@@ -25,6 +25,11 @@ use RuntimeException;
  *
  * This service orchestrates all attachment operations including creation, update,
  * deletion, and querying with support for roles, metadata, and constraints.
+ *
+ * A given (rattachable, target) pair may hold several attachments, provided they
+ * use distinct roles. Uniqueness is enforced per role via the target's
+ * {@see RattachmentInterface::uniqueTargets()} declaration, not by the service
+ * itself.
  */
 final class RattachmentService implements RattachmentServiceInterface
 {
@@ -49,13 +54,14 @@ final class RattachmentService implements RattachmentServiceInterface
         $this->constraintValidator->validateConstraints($rattachable, $target, $role);
         $this->constraintValidator->validateUniqueConstraints($rattachable, $target, $role);
 
-        if ($this->isAttached($rattachable, $target)) {
+        if ($this->isAttachedWithRole($rattachable, $target, $role)) {
             throw new RuntimeException(sprintf(
-                '%s %s is already attached to %s %s',
+                '%s %s is already attached to %s %s with role "%s"',
                 $rattachable->getMorphClass(),
                 $rattachable->getKey(),
                 $target->getMorphClass(),
-                $target->getKey()
+                $target->getKey(),
+                $role->getValue(),
             ));
         }
 
@@ -199,6 +205,28 @@ final class RattachmentService implements RattachmentServiceInterface
             'rattachable_id' => $rattachable->getKey(),
             'target_type' => $target->getMorphClass(),
             'target_id' => $target->getKey(),
+        ]);
+
+        return $this->repository->exists($filter);
+    }
+
+    /**
+     * Determine whether a specific role already exists between two models.
+     *
+     * Unlike {@see isAttached()}, this method checks uniqueness per role
+     * rather than per (rattachable, target) pair.
+     */
+    public function isAttachedWithRole(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role,
+    ): bool {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+            'role' => $role,
         ]);
 
         return $this->repository->exists($filter);
@@ -826,11 +854,9 @@ final class RattachmentService implements RattachmentServiceInterface
 
             $newTargetIds[] = $target->getKey();
 
-            $existing = $this->findExisting($rattachable, $target);
+            $existing = $this->findExistingWithRole($rattachable, $target, $role);
 
             if ($existing) {
-                $this->updateRole($rattachable, $target, $role);
-
                 if (! empty($metadata)) {
                     $this->updateMetadata($rattachable, $target, $metadata);
                 }
@@ -931,6 +957,10 @@ final class RattachmentService implements RattachmentServiceInterface
     /**
      * Finds an existing attachment between two models.
      *
+     * When several attachments exist between the same pair with different roles,
+     * this method returns the first one encountered. Use {@see findExistingWithRole()}
+     * to target a specific role.
+     *
      * @return Model|null The attachment model or null if not found
      */
     private function findExisting(Model&RattachmentInterface $rattachable, Model&RattachmentInterface $target): ?Model
@@ -940,6 +970,34 @@ final class RattachmentService implements RattachmentServiceInterface
             'rattachable_id' => $rattachable->getKey(),
             'target_type' => $target->getMorphClass(),
             'target_id' => $target->getKey(),
+        ]);
+
+        $findByRecord = new FindByRecord(
+            filters: $filter,
+            limit: 1,
+        );
+
+        $collection = $this->repository->findBy($findByRecord);
+
+        return $collection->first();
+    }
+
+    /**
+     * Finds an existing attachment between two models for a specific role.
+     *
+     * @return Model|null The attachment model or null if not found
+     */
+    private function findExistingWithRole(
+        Model&RattachmentInterface $rattachable,
+        Model&RattachmentInterface $target,
+        EnumerableInterface $role
+    ): ?Model {
+        $filter = RattachmentFilterRecord::from([
+            'rattachable_type' => $rattachable->getMorphClass(),
+            'rattachable_id' => $rattachable->getKey(),
+            'target_type' => $target->getMorphClass(),
+            'target_id' => $target->getKey(),
+            'role' => $role,
         ]);
 
         $findByRecord = new FindByRecord(

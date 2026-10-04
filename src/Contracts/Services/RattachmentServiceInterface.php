@@ -92,13 +92,27 @@ interface RattachmentServiceInterface
     public function detachAll(Model&RattachmentInterface $model): void;
 
     /**
-     * Checks if a model is attached to another model.
+     * Checks if a model is attached to another model, regardless of role.
      *
      * @param  Model&RattachmentInterface  $rattachable  The model being checked
      * @param  Model&RattachmentInterface  $target  The target model
-     * @return bool True if attached, false otherwise
+     * @return bool True if at least one attachment exists, false otherwise
      */
     public function isAttached(Model&RattachmentInterface $rattachable, Model&RattachmentInterface $target): bool;
+
+    /**
+     * Checks if a specific role exists between two models.
+     *
+     * Unlike {@see isAttached()}, this method targets a precise role. A pair of
+     * models may hold several attachments with distinct roles; this method
+     * returns true only when the given role is part of them.
+     *
+     * @param  Model&RattachmentInterface  $rattachable  The model being checked
+     * @param  Model&RattachmentInterface  $target  The target model
+     * @param  EnumerableInterface  $role  The role to check
+     * @return bool True if the role exists between the two models
+     */
+    public function isAttachedWithRole(Model&RattachmentInterface $rattachable, Model&RattachmentInterface $target, EnumerableInterface $role): bool;
 
     /**
      * Checks if any model is attached to a target with a specific role.
@@ -331,6 +345,11 @@ interface RattachmentServiceInterface
     /**
      * Retrieves a specific attachment between two models.
      *
+     * When several attachments exist between the same pair with different roles,
+     * this method returns the first one encountered. Use role-specific methods
+     * such as {@see getRattachablesByRole()} or {@see isAttachedWithRole()} to
+     * target a precise role.
+     *
      * @param  Model&RattachmentInterface  $rattachable  The attached model
      * @param  Model&RattachmentInterface  $target  The target model
      * @return Model|null The attachment model or null if not found
@@ -376,8 +395,9 @@ interface RattachmentServiceInterface
     /**
      * Synchronizes attachments for a model with a given set of targets and roles.
      *
-     * Creates new attachments, updates existing ones, and removes attachments
-     * that are no longer present in the target list.
+     * Creates new attachments for (target, role) pairs that do not exist yet,
+     * updates metadata for those that already exist, and removes attachments
+     * whose target is no longer present in the list.
      *
      * @param  Model&RattachmentInterface  $rattachable  The attached model
      * @param  array<array{target: Model&RattachmentInterface, role: EnumerableInterface, metadata?: array<string, mixed>}>  $targets
